@@ -286,3 +286,101 @@ Phase status after Session 2:
 | config/fitness_weights.yaml | Najlepsze wagi (dowolne) |
 | config/fitness_weights_sum1.yaml | Najlepsze wagi (suma=1) |
 | scripts/grid_search_fitness.py | Skrypt do grid search |
+
+---
+
+## 2026-04-27 — Session 3: Phase 0 completion, corpus quality analysis, sensitivity analysis
+
+### Environment
+- Ubuntu 24.04 WSL2 network issues (TCP/443 blocked by Symantec, ICMP works)
+- Migration to Ubuntu 22.04 planned to fix network compatibility with Windows 10
+- Before migration: conda env export and pip freeze backups required
+
+### Key methodological decision: metrics on model outputs not inputs
+Metrics H(X), C(X), I(X;seed) must be measured on MODEL OUTPUTS after 
+exposure to document, not on input documents. Measuring on inputs creates 
+length confound (short predator docs inflate C(X) artificially).
+
+### Canonical run results (20260427T120238Z)
+- food: H=5.503, C=0.526, I=0.0900, Jaccard=0.0180, fitness=+0.035
+- predator: H=5.240, C=0.425, I=0.0717, Jaccard=0.0210, fitness=-0.024
+- noise: H=5.771, C=0.564, I=0.0912, Jaccard=0.0199, fitness=+0.035
+- KW: H p=7.68e-06, C p=3.12e-12, I p=0.061 (borderline)
+- Fitness weights frozen: w1=0.3, w2=0.5, w3=0.2
+
+### Corpus quality analysis (corpus_quality_analysis.py)
+Per-dataset predator quality ranking by effect size food/predator:
+
+| Dataset           | H effect | C effect | I effect | Ranking  |
+|-------------------|----------|----------|----------|----------|
+| predator_climate  | -0.823   | -0.851   | -0.607   | 1 (best) |
+| predator_covid    | -0.496   | -0.557   | -0.278   | 2        |
+| predator_vaccines | -0.797   | -0.774   | +0.274   | anomalous|
+
+### Vaccine anomaly discovery
+VaccineLies MisT predator shows REVERSED direction for I and Jaccard:
+model generates outputs CLOSER to seed after vaccine misinformation than 
+after food. Hypothesis: academically-phrased misinformation is informationally 
+invisible to the base model. ClimateFever uses authentic internet language 
+that effectively destabilizes the model. VaccineLies uses academic taxonomy 
+language that the model treats as scientific text.
+This is a key finding for the ALife Letter discussion section.
+
+### System sensitivity to corpus quality
+I(X;seed): p=1.15e-11 with degraded CoAID corpus (looping outputs, artifacts)
+vs p=0.061 after cleanup. System metrics detect difference between authentic 
+and synthetic misinformation. This is a methodological finding, not a pipeline error.
+
+### CoAID cleanup
+102/141 documents removed (72%): webscraping artifacts (Facebook UI, HTTP errors).
+Remaining: 39 authentic + 22 synthetic taxonomy documents = 61 predator_covid.
+
+### Noise corpus fix
+Original noise (food sentences only) indistinguishable from food (effect ~0.06).
+Regenerated: 50/50 food+predator sentences. Slight improvement.
+
+### Jaccard correlation results
+- food: corr=0.597 (p=2.5e-08)
+- predator: corr=0.642 (p=8.6e-15)
+- noise: corr=0.491 (p=0.003)
+All below 0.8 threshold → Jaccard not redundant, justified for Phase 2 fitness.
+
+### Sensitivity analysis results (sensitivity_analysis.py)
+All metrics statistically significant from 50 tokens (threshold=50).
+C(X) delta reverses direction between 150 and 200 tokens:
+- 150 tokens: C delta = -0.22 (predator lower complexity than food)
+- 200 tokens: C delta = +0.23 (predator higher complexity than food)
+Choice of 200 tokens as standard justified by stability of effect directions.
+
+### Progressive logging implemented
+Both phase0_metric_validation.py and sensitivity_analysis.py now write
+metrics_progressive.jsonl with flush after each document. Resume-on-restart
+implemented: already-processed IDs are skipped.
+
+### Validation protocol created
+docs/validation_protocol.md — living document with 5 levels of validation tests,
+priorities, and formal definition of "evolution" in the project.
+
+### Files added/updated today
+- data/raw/predator_covid.jsonl (cleaned + supplement, 61 docs)
+- data/raw/predator_covid_supplement.jsonl (22 synthetic taxonomy docs)
+- data/raw/noise.jsonl (regenerated 50/50)
+- scripts/sensitivity_analysis.py (new)
+- scripts/corpus_quality_analysis.py (new)
+- docs/validation_protocol.md (new)
+- docs/EvoLLM_wnioski_20260427.md (new)
+- src/analysis/phase0_metric_validation.py (progressive logging added)
+
+### Phase status after Session 3
+- Phase 0: FUNCTIONALLY COMPLETE (sensitivity done, canon run done)
+- Open: style swap test (Phase 1), DTW protocol (before Phase 2)
+- Pending: streamlit dashboard (waiting for TCP unblock)
+- Pending: better COVID predator (waiting for network)
+- Pending: Ubuntu 22.04 migration
+
+### Next session priorities
+1. Ubuntu 22.04 migration (if Jacek unblocks TCP before migration)
+2. conda env export backup before migration
+3. Install streamlit + full stats stack after network fix
+4. Phase 1: configure three biomes, run first experiment
+5. Start ALife Letter draft
