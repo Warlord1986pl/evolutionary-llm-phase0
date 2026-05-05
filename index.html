@@ -707,7 +707,7 @@ function Simulation() {
   );
 }
 
-window.Simulation = Simulation;
+ReactDOM.createRoot(document.getElementById('sim-root')).render(React.createElement(Simulation));
 
 </script>
 <script type="text/babel">
@@ -1122,7 +1122,7 @@ function MIViz() {
     </div>
   );
 }
-window.MIViz = MIViz;
+ReactDOM.createRoot(document.getElementById('mi-root')).render(React.createElement(MIViz));
 </script>
 <script type="text/babel">
 const { useState } = React;
@@ -1338,17 +1338,11 @@ function LD50Visualization() {
   );
 }
 
-window.LD50Visualization = LD50Visualization;
+ReactDOM.createRoot(document.getElementById('ld50fig-root')).render(React.createElement(LD50Visualization));
 
 </script>
 
-<script>
-window.addEventListener('DOMContentLoaded', function() {
-  ReactDOM.createRoot(document.getElementById('sim-root')).render(React.createElement(Simulation));
-  ReactDOM.createRoot(document.getElementById('mi-root')).render(React.createElement(MIViz));
-  ReactDOM.createRoot(document.getElementById('ld50fig-root')).render(React.createElement(LD50Visualization));
-});
-</script>
+
 
 </body>
 </html>
