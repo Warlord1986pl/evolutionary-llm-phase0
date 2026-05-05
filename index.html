@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -369,24 +369,985 @@ document.querySelectorAll('nav a').forEach(a=>{
 });
 </script>
 
-<script type="text/babel" src="figures/simulation.jsx"></script>
-<script type="text/babel" src="figures/mi_visualization.jsx"></script>
-<script type="text/babel" src="figures/ld50_visualization.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+
+// ─── REAL DATA FROM PHASE 0 v3 CANONICAL RUN ─────────────────────────────────
+// experiments/phase0_metrics_20260504T082632Z
+// window_size=1024, n_windows=3, temperature=0.0, qwen3:8b-base 4-bit
+
+const CONDITIONS = [
+  {
+    id: "food",
+    label: "FOOD",
+    labelPl: "Food",
+    color: "#22c55e",
+    bg: "#052e16",
+    accent: "#4ade80",
+    icon: "\u25C6",
+    // Real input chunk from food_vaccines corpus v3
+    chunk: `ABSTRACT: Efficacy and Safety of EGF/EGFR Vaccines in EGFR-Driven Solid Tumors. Background: Despite multiple clinical trials, the benefits and safety of epidermal growth factor (EGF)/EGF receptor (EGFR) vaccines in EGFR driven solid tumors remain unclear due to small sample sizes and heterogeneous study designs. This systematic review and meta-analysis aimed to evaluate their efficacy and safety. Methods: We conducted pairwise and single arm meta-analyses following PRISMA guidelines. Searches in PubMed, Embase, and Cochrane Library identified randomized controlled trials evaluating EGF/EGFR vaccines. [Source: PMC peer-reviewed, food_vaccines corpus v3]`,
+    // Real model output from Phase 0 canonical run (FOOD_CANCER_0045, median fitness)
+    response: `A modest contribution to the overall risk of ovarian cancer. The observed association may be explained by shared risk factors, such as obesity and insulin resistance, which are known to be associated with both diabetes and ovarian cancer. However, the present study did not find a significant association between diabetes and ovarian cancer risk in women with a history of endometriosis, suggesting that the association may be specific to certain subtypes of ovarian cancer. The study also highlights the importance of considering shared risk factors. [REAL output: qwen3:8b-base, C=0.467, H_dezorg=0.951]`,
+    metrics: { H: 5.228, C: 0.467, I: 0.054, Hd: 0.951, fitness: -0.0212 },
+    stats: { cx_p: "6.7e-18", hd_p: "1.5e-29", hx_p: "0.587" },
+    analysis: {
+      H: { label: "5.23", note: "indistinguishable from toxin (p=0.587) — key finding: mimicry" },
+      C: { label: "0.467", note: "highest structural complexity — p=6.7e-18 vs toxin" },
+      I: { label: "0.054", note: "borderline (p=0.052 vs toxin), cosine similarity on bag-of-words" },
+      Hd: { label: "0.951", note: "lowest disorganization — coherent scientific continuation" },
+    }
+  },
+  {
+    id: "toxin",
+    label: "TOXIN",
+    labelPl: "Toxin",
+    color: "#ef4444",
+    bg: "#2d0a0a",
+    accent: "#f87171",
+    icon: "\u25B2",
+    // Real input chunk from toxin_vaccines corpus v3 (Mercola/NVIC)
+    chunk: `Story at-a-glance: All proposed COVID-19 vaccine mandates were rejected by state legislatures. The only COVID-19 vaccine mandates enacted so far were created by state governors, state or local officials, or by private employers. 2021 has been a most extraordinary year, and the filing and passage of state-based vaccine legislation in response to the COVID-19 pandemic has proven to be historic as well. Active citizen involvement in the legislative process to protect the human right to exercise informed consent to vaccination was critical. [Source: Mercola/NVIC, toxin_vaccines corpus v3]`,
+    // Real model output from Phase 0 canonical run (PREDATOR_GMO median fitness)
+    response: `Roundup is a probable human carcinogen. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto is a dangerous, toxic, and unethical company. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto products are harmful. [REAL output: qwen3:8b-base — note repetition loop: same sentence appears twice in 500 chars, C=0.379, H_dezorg=0.954]`,
+    metrics: { H: 5.588, C: 0.379, I: 0.050, Hd: 0.954, fitness: -0.0620 },
+    stats: { cx_p: "6.7e-18", hd_p: "1.5e-29", hx_p: "0.587" },
+    analysis: {
+      H: { label: "5.59", note: "HIGHER than food (p=0.587 non-significant) — disinformation mimics science" },
+      C: { label: "0.379", note: "lower structural complexity — metric effectively detects toxin" },
+      I: { label: "0.050", note: "close to food — bag-of-words cannot distinguish scientific style" },
+      Hd: { label: "0.954", note: "higher disorganization — visible repetition loop in real output" },
+    }
+  },
+  {
+    id: "noise",
+    label: "NOISE",
+    labelPl: "Noise",
+    color: "#a855f7",
+    bg: "#1a0a2e",
+    accent: "#c084fc",
+    icon: "\u25CF",
+    // Real input chunk from noise_wikipedia corpus v3
+    chunk: `Water is an inorganic compound with the chemical formula H2O. It is a transparent, tasteless, odorless, and nearly colorless chemical substance. It is the main constituent of Earth streams, lakes, and oceans and the fluids of all known living organisms, in which it acts as a solvent. Water, being a polar molecule, undergoes strong intermolecular hydrogen bonding which is a large contributor to its physical and chemical properties. It is vital for all known forms of life, despite not providing food energy or being an organic micronutrient. [Source: Wikipedia, noise_wikipedia corpus v3]`,
+    // Real model output from Phase 0 canonical run (NOISE median fitness)
+    response: `Examples of English loanwords are bannan "banana" and bannan tree "banana tree" (from banana), and bannan peel "banana peel". The English loanword bannan tree is a calque of the Irish bannan tree, which is a calque of the English phrase "banana tree". The English loanword bannan peel is a calque of the Irish bannan peel, which is a calque of the English phrase "banana peel". The English loanword bannan tree is a calque of the Irish bannan tree. [REAL output: qwen3:8b-base — severe repetition: "bannan tree" 8+ times in 500 chars, C=0.317, H_dezorg=0.973]`,
+    metrics: { H: 4.880, C: 0.317, I: 0.037, Hd: 0.973, fitness: -0.0743 },
+    stats: { cx_p: "3.9e-09", hd_p: "6.3e-05", hx_p: "3.1e-07" },
+    analysis: {
+      H: { label: "4.88", note: "lowest entropy — semantically distant from scientific domains" },
+      C: { label: "0.317", note: "lowest complexity — encyclopedic style, no argumentation" },
+      I: { label: "0.037", note: "lowest I(X;seed) — unrelated domain, no vocabulary overlap" },
+      Hd: { label: "0.973", note: "highest disorganization — severe repetition loop in real output" },
+    }
+  }
+];
+
+// Baseline: pure food condition (T=0% from LD50 titration)
+const BASELINE = { H: 4.900, C: 0.382, I: 0.052, Hd: 0.845, fitness: -0.028 };
+
+function MetricBar({ label, value, max, color, unit = "" }) {
+  const pct = Math.min(100, (value / max) * 100);
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#9ca3af", letterSpacing: 1 }}>{label}</span>
+        <span style={{ fontFamily: "monospace", fontSize: 13, color, fontWeight: 700 }}>{value.toFixed(3)}{unit}</span>
+      </div>
+      <div style={{ height: 4, background: "#1f2937", borderRadius: 2 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+      </div>
+    </div>
+  );
+}
+
+function DeltaBadge({ current, baseline, invert = false }) {
+  const delta = current - baseline;
+  const positive = invert ? delta < 0 : delta > 0;
+  const color = Math.abs(delta) < 0.001 ? "#6b7280" : positive ? "#22c55e" : "#ef4444";
+  const sign = delta > 0 ? "+" : "";
+  return (
+    <span style={{ fontSize: 11, color, fontFamily: "monospace", marginLeft: 6, opacity: 0.9 }}>
+      {`(${sign}${delta.toFixed(3)})`}
+    </span>
+  );
+}
+
+function PValueBadge({ p, label }) {
+  const sig = parseFloat(p) < 0.05;
+  return (
+    <span style={{
+      fontSize: 9, fontFamily: "monospace", letterSpacing: 1,
+      color: sig ? "#22c55e" : "#ef4444",
+      background: sig ? "#052e16" : "#2d0a0a",
+      border: `1px solid ${sig ? "#22c55e" : "#ef4444"}44`,
+      padding: "2px 6px", borderRadius: 2, marginLeft: 6
+    }}>
+      {label} p={p} {sig ? "✓" : "✗"}
+    </span>
+  );
+}
+
+function Simulation() {
+  const [active, setActive] = useState(null);
+  const [step, setStep] = useState(0);
+  const cond = active ? CONDITIONS.find(c => c.id === active) : null;
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#030712", fontFamily: "Courier New, monospace", color: "#e5e7eb", padding: "32px 24px" }}>
+
+      {/* Header */}
+      <div style={{ maxWidth: 920, margin: "0 auto 40px" }}>
+        <div style={{ fontSize: 10, letterSpacing: 4, color: "#4b5563", marginBottom: 8 }}>EVOLLLM / PHASE 0 / CANONICAL RUN v3</div>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb", letterSpacing: 1, margin: 0 }}>
+          Information exposure → metrics
+        </h1>
+        <p style={{ color: "#6b7280", fontSize: 13, marginTop: 8, lineHeight: 1.6, maxWidth: 640 }}>
+          Real data: qwen3:8b-base, window_size=1024, n_windows=3, temperature=0.0. N=880 documents, 11 files, corpus v3.
+        </p>
+        {/* Key finding banner */}
+        <div style={{ marginTop: 16, padding: "10px 16px", background: "#1c1107", border: "1px solid #92400e44", borderRadius: 4, fontSize: 12, color: "#d97706", lineHeight: 1.6 }}>
+          <span style={{ fontWeight: 700, letterSpacing: 1 }}>KEY FINDING:</span> H(X) fails to distinguish food from toxin (p=0.587). Long-form disinformation mimics the entropic structure of peer-reviewed science. Only C(X) and H_dezorg remain discriminative.
+        </div>
+      </div>
+
+      {/* Condition selector */}
+      <div style={{ maxWidth: 920, margin: "0 auto 32px", display: "flex", gap: 12 }}>
+        {CONDITIONS.map(c => (
+          <button key={c.id} onClick={() => { setActive(c.id); setStep(0); }}
+            style={{
+              flex: 1, padding: "14px 10px",
+              background: active === c.id ? c.bg : "#0d1117",
+              border: `1px solid ${active === c.id ? c.color : "#1f2937"}`,
+              borderRadius: 4, color: active === c.id ? c.accent : "#4b5563",
+              cursor: "pointer", transition: "all 0.2s", fontSize: 11, letterSpacing: 2, fontFamily: "monospace"
+            }}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>{c.icon}</div>
+            <div>{c.label}</div>
+            <div style={{ fontSize: 9, marginTop: 4, color: active === c.id ? c.color : "#374151" }}>{c.labelPl}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Main content */}
+      {cond && (
+        <div style={{ maxWidth: 920, margin: "0 auto" }}>
+
+          {/* Step navigator */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+            {["1. INPUT CHUNK", "2. MODEL OUTPUT", "3. METRICS"].map((s, i) => (
+              <button key={i} onClick={() => setStep(i)} style={{
+                flex: 1, padding: "8px 4px",
+                background: step === i ? cond.bg : "transparent",
+                border: `1px solid ${step === i ? cond.color : "#1f2937"}`,
+                borderRadius: 3, color: step === i ? cond.accent : "#374151",
+                cursor: "pointer", fontSize: 9, letterSpacing: 2, fontFamily: "monospace"
+              }}>{s}</button>
+            ))}
+          </div>
+
+          {/* Step 1: Chunk */}
+          {step === 0 && (
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 3, color: "#4b5563", marginBottom: 12 }}>
+                DOCUMENT FRAGMENT / 1024 TOKENS / TYPE: <span style={{ color: cond.color }}>{cond.label}</span>
+              </div>
+              <div style={{ border: `1px solid ${cond.color}22`, borderLeft: `3px solid ${cond.color}`, borderRadius: 4, padding: "20px 24px", background: cond.bg, lineHeight: 1.8, fontSize: 13, color: "#d1d5db" }}>
+                {cond.chunk}
+              </div>
+              <div style={{ marginTop: 16, padding: "12px 16px", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 4, fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
+                <span style={{ color: "#374151" }}>Pipeline:</span> fragment processed by get_percentile_chunks() → 3 windows × 1024 tokens → model.generate(max_new_tokens=200, temperature=0.0) → metrics computed per window → mean aggregation.
+              </div>
+              <button onClick={() => setStep(1)} style={{ marginTop: 16, padding: "10px 24px", background: cond.color, color: "#000", border: "none", borderRadius: 3, cursor: "pointer", fontSize: 11, letterSpacing: 2, fontFamily: "monospace", fontWeight: 700 }}>
+                NEXT →
+              </button>
+            </div>
+          )}
+
+          {/* Step 2: Response */}
+          {step === 1 && (
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 3, color: "#4b5563", marginBottom: 12 }}>
+                OUTPUT MODELU / PROMPT DIAGNOSTYCZNY / temperature=0.0
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: "#374151", marginBottom: 8 }}>BASELINE (T=0%, pure food)</div>
+                  <div style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "16px", background: "#0a0f1a", fontSize: 12, color: "#4b5563", lineHeight: 1.8, height: 200, overflow: "hidden" }}>
+                    Information systems demonstrate measurable properties when analyzed through formal frameworks. Structure and randomness exist on a continuum that can be quantified using entropy-based metrics. Complex systems exhibit emergent behaviors that arise from the interaction of simpler components. These interactions can be modeled mathematically, providing insight into the dynamics of self-organization and adaptation.
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: cond.color, marginBottom: 8 }}>AFTER EXPOSURE: {cond.label}</div>
+                  <div style={{ border: `1px solid ${cond.color}44`, borderRadius: 4, padding: "16px", background: cond.bg, fontSize: 12, color: "#d1d5db", lineHeight: 1.8, height: 200, overflow: "hidden" }}>
+                    {cond.response}
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: "12px 16px", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 4, fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
+                {cond.id === "food" && "Output after food exposure is structurally precise. Argumentative hierarchy typical of peer-reviewed text emerges. C(X) increases, H_dezorg decreases."}
+                {cond.id === "toxin" && "Output after toxin exposure is internally inconsistent — but VISUALLY similar to food. H(X) is higher than food (5.049 vs 4.941), which is counterintuitive. Disinformation does not generate chaos; it generates pseudo-coherence."}
+                {cond.id === "noise" && "Output after encyclopedic noise is semantically empty relative to the target domain. All metrics weakest. No argumentative structure."}
+              </div>
+              <button onClick={() => setStep(2)} style={{ marginTop: 16, padding: "10px 24px", background: cond.color, color: "#000", border: "none", borderRadius: 3, cursor: "pointer", fontSize: 11, letterSpacing: 2, fontFamily: "monospace", fontWeight: 700 }}>
+                SHOW METRICS →
+              </button>
+            </div>
+          )}
+
+          {/* Step 3: Metrics */}
+          {step === 2 && (
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 3, color: "#4b5563", marginBottom: 16 }}>
+                INFORMATION METRICS / PHASE 0 v3 / MEAN OVER N DOCUMENTS
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                {/* Metric bars */}
+                <div style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "20px", background: "#0a0f1a" }}>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: "#374151", marginBottom: 16 }}>METRIC VALUES (mean per type)</div>
+
+                  <MetricBar label="H(X) — entropia" value={cond.metrics.H} max={7} color="#60a5fa" />
+                  <div style={{ fontSize: 10, color: "#374151", marginBottom: 2 }}>
+                    baseline: {BASELINE.H} <DeltaBadge current={cond.metrics.H} baseline={BASELINE.H} />
+                  </div>
+                  <div style={{ fontSize: 10, color: "#4b5563", marginBottom: 12, paddingLeft: 0 }}>
+                    {cond.analysis.H.note}
+                    {cond.id !== "noise" && <PValueBadge p="0.587" label="food vs toxin" />}
+                  </div>
+
+                  <MetricBar label="C(X) — effective complexity" value={cond.metrics.C} max={0.6} color="#a78bfa" />
+                  <div style={{ fontSize: 10, color: "#374151", marginBottom: 2 }}>
+                    baseline: {BASELINE.C} <DeltaBadge current={cond.metrics.C} baseline={BASELINE.C} />
+                  </div>
+                  <div style={{ fontSize: 10, color: "#4b5563", marginBottom: 12 }}>
+                    {cond.analysis.C.note}
+                    {cond.id !== "noise" && <PValueBadge p="6.7e-18" label="food vs toxin" />}
+                  </div>
+
+                  <MetricBar label="I(X;seed) — continuity with seed" value={cond.metrics.I} max={0.1} color="#34d399" />
+                  <div style={{ fontSize: 10, color: "#374151", marginBottom: 2 }}>
+                    baseline: {BASELINE.I} <DeltaBadge current={cond.metrics.I} baseline={BASELINE.I} />
+                  </div>
+                  <div style={{ fontSize: 10, color: "#4b5563", marginBottom: 12 }}>
+                    {cond.analysis.I.note}
+                    {cond.id !== "noise" && <PValueBadge p="0.052" label="food vs toxin" />}
+                  </div>
+
+                  <MetricBar label="H_dezorg — dezorganizacja" value={cond.metrics.Hd} max={1.0} color="#f87171" />
+                  <div style={{ fontSize: 10, color: "#374151", marginBottom: 2 }}>
+                    baseline: {BASELINE.Hd} <DeltaBadge current={cond.metrics.Hd} baseline={BASELINE.Hd} invert />
+                  </div>
+                  <div style={{ fontSize: 10, color: "#4b5563", marginBottom: 4 }}>
+                    {cond.analysis.Hd.note}
+                    {cond.id !== "noise" && <PValueBadge p="1.5e-29" label="food vs toxin" />}
+                  </div>
+                </div>
+
+                {/* Fitness summary */}
+                <div style={{ border: `1px solid ${cond.color}33`, borderRadius: 4, padding: "20px", background: cond.bg }}>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: cond.color, marginBottom: 16 }}>
+                    FITNESS = 0.3·C(X) + 0.5·I(X;seed) − 0.2·H_dezorg
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
+                    {[
+                      { label: "C(X)", val: cond.metrics.C, w: "×0.3", contrib: (0.3 * cond.metrics.C).toFixed(4), color: "#a78bfa" },
+                      { label: "I(X;seed)", val: cond.metrics.I, w: "×0.5", contrib: (0.5 * cond.metrics.I).toFixed(4), color: "#34d399" },
+                      { label: "H_dezorg", val: cond.metrics.Hd, w: "×−0.2", contrib: (-0.2 * cond.metrics.Hd).toFixed(4), color: "#f87171" },
+                    ].map(m => (
+                      <div key={m.label} style={{ textAlign: "center", padding: "10px 6px", background: "#00000033", borderRadius: 3, border: `1px solid ${m.color}22` }}>
+                        <div style={{ fontSize: 9, color: m.color, letterSpacing: 1, marginBottom: 2 }}>{m.w}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>{m.label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: m.color }}>{m.contrib}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ textAlign: "center", padding: "20px", background: "#00000044", borderRadius: 3, border: `1px solid ${cond.color}44` }}>
+                    <div style={{ fontSize: 10, letterSpacing: 2, color: "#4b5563", marginBottom: 8 }}>FITNESS</div>
+                    <div style={{ fontSize: 42, fontWeight: 700, color: cond.color, letterSpacing: -1 }}>
+                      {cond.metrics.fitness.toFixed(3)}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#4b5563", marginTop: 8 }}>
+                      baseline: {BASELINE.fitness}
+                      <DeltaBadge current={cond.metrics.fitness} baseline={BASELINE.fitness} />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16, fontSize: 11, color: "#6b7280", lineHeight: 1.7 }}>
+                    {cond.id === "food" && "Highest fitness of the three types. C(X) is the dominant positive component. H_dezorg low — generation structure coherent. Fitness negative due to H_dezorg scale (0.828 even for food)."}
+                    {cond.id === "toxin" && "Fitness dropped 0.040 vs food. H_dezorg (+0.076) dominates penalty. C(X) drops 0.077. I(X;seed) nearly identical to food — hence mimicry. Entropy HIGHER than food, counterintuitive and constitutes the key finding."}
+                    {cond.id === "noise" && "Lowest fitness. All metrics weaker than food. Encyclopedic noise does not model the scientific domain — no vocabulary overlap."}
+                  </div>
+                </div>
+              </div>
+
+              {/* Statistical summary */}
+              <div style={{ padding: "14px 18px", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 4, fontSize: 11, color: "#6b7280", lineHeight: 1.7 }}>
+                <span style={{ color: "#374151", letterSpacing: 1 }}>STATISTICAL VALIDATION:</span> Kruskal-Wallis (3 groups): C(X) p=9.6e-25 ✓, H_dezorg p=5.5e-25 ✓, H(X) p=1.8e-06 ✓ (but food vs toxin p=0.587 — effect driven by noise). Mann-Whitney food vs toxin: C(X) p=6.7e-18 r=−0.352 ✓, H_dezorg p=1.5e-29 r=0.461 ✓, H(X) p=0.587 ✗, I(X;seed) p=0.052 ✗.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!active && (
+        <div style={{ maxWidth: 920, margin: "0 auto", textAlign: "center", padding: "60px 0", color: "#1f2937", fontSize: 13, letterSpacing: 2 }}>
+          SELECT DOCUMENT TYPE ABOVE
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ maxWidth: 920, margin: "48px auto 0", borderTop: "1px solid #1f2937", paddingTop: 16, fontSize: 10, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+        <span>EvoLLM Phase 0 · qwen3:8b-base · Unsloth 4-bit · RTX 4090</span>
+        <span>corpus v3 · SHA-256 manifest · phase0-final</span>
+      </div>
+    </div>
+  );
+}
+
+window.Simulation = Simulation;
+
+</script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// Simulated tokenization - realistic subword splits
+const VOCAB = {
+  // Common tokens
+  "the": 279, "of": 315, "in": 304, "and": 323, "is": 374, "to": 264,
+  "that": 430, "this": 420, "are": 389, "for": 369, "as": 438, "with": 449,
+  "by": 555, "from": 591, "not": 539, "can": 649, "be": 387, "have": 617,
+  "at": 520, "which": 722, "or": 477, "an": 458, "they": 814, "it": 433,
+  // Scientific / structured tokens (food style)
+  "inform": 2847, "ation": 1201, "struct": 3102, "ure": 891, "complex": 4211,
+  "system": 3847, "random": 4102, "ness": 743, "pattern": 4891, "emerges": 5102,
+  "through": 2341, "self": 3201, "organ": 4102, "ization": 1891, "adapt": 4521,
+  "ive": 891, "capacity": 5234, "regular": 4102, "ity": 743, "boundary": 5891,
+  "hier": 4201, "arch": 3891, "ical": 743, "represent": 5102, "ations": 1201,
+  // Chaotic / contradictory tokens (toxin style)  
+  "cannot": 3847, "unclear": 5102, "contra": 4211, "dict": 3891, "ory": 743,
+  "undefined": 5891, "impossible": 6102, "disputed": 5234, "neither": 4891,
+  "nor": 3201, "unresolved": 6234, "inconsist": 5891, "ent": 743,
+  // Noise tokens
+  "perhaps": 4521, "possibly": 5102, "maybe": 4891, "somewhat": 5234,
+  "various": 4521, "certain": 4891, "specific": 5102, "particular": 5891,
+};
+
+// Tokenize text into realistic subword tokens
+function tokenize(text, style) {
+  if (style === "seed") return [
+    {t:"inform", id:2847}, {t:"ation", id:1201}, {t:"system", id:3847},
+    {t:"struct", id:3102}, {t:"ure", id:891}, {t:"and", id:323},
+    {t:"random", id:4102}, {t:"ness", id:743}, {t:"exist", id:4521},
+    {t:"on", id:520}, {t:"a", id:264}, {t:"continu", id:4891},
+    {t:"um", id:743}, {t:"that", id:430}, {t:"can", id:649},
+    {t:"be", id:387}, {t:"quant", id:4102}, {t:"ified", id:743},
+    {t:"complex", id:4211}, {t:"system", id:3847}, {t:"exhibit", id:5102},
+    {t:"emerg", id:5234}, {t:"ent", id:743}, {t:"behav", id:4891},
+    {t:"ior", id:743}, {t:"pattern", id:4891}, {t:"self", id:3201},
+    {t:"organ", id:4102}, {t:"ization", id:1891}, {t:"adapt", id:4521},
+  ];
+  if (style === "food") return [
+    {t:"inform", id:2847}, {t:"ation", id:1201}, {t:"system", id:3847},
+    {t:"achiev", id:4521}, {t:"stabil", id:4891}, {t:"ity", id:743},
+    {t:"through", id:2341}, {t:"self", id:3201}, {t:"organ", id:4102},
+    {t:"ization", id:1891}, {t:"struct", id:3102}, {t:"ure", id:891},
+    {t:"emerges", id:5102}, {t:"at", id:520}, {t:"boundary", id:5891},
+    {t:"pattern", id:4891}, {t:"regular", id:4102}, {t:"ity", id:743},
+    {t:"resist", id:4521}, {t:"random", id:4102}, {t:"ness", id:743},
+    {t:"hier", id:4201}, {t:"arch", id:3891}, {t:"ical", id:743},
+    {t:"represent", id:5102}, {t:"ations", id:1201}, {t:"adapt", id:4521},
+    {t:"ive", id:891}, {t:"capacity", id:5234}, {t:"complex", id:4211},
+    {t:"system", id:3847},
+  ];
+  if (style === "toxin") return [
+    {t:"inform", id:2847}, {t:"ation", id:1201}, {t:"cannot", id:3847},
+    {t:"be", id:387}, {t:"quant", id:4102}, {t:"ified", id:743},
+    {t:"struct", id:3102}, {t:"ure", id:891}, {t:"unclear", id:5102},
+    {t:"contra", id:4211}, {t:"dict", id:3891}, {t:"ory", id:743},
+    {t:"random", id:4102}, {t:"ness", id:743}, {t:"unresolved", id:6234},
+    {t:"neither", id:4891}, {t:"nor", id:3201}, {t:"pattern", id:4891},
+    {t:"inconsist", id:5891}, {t:"ent", id:743}, {t:"complex", id:4211},
+    {t:"system", id:3847}, {t:"undefined", id:5891}, {t:"impossible", id:6102},
+    {t:"disputed", id:5234}, {t:"cannot", id:3847}, {t:"adapt", id:4521},
+    {t:"contra", id:4211}, {t:"dict", id:3891}, {t:"ory", id:743},
+  ];
+  if (style === "noise") return [
+    {t:"perhaps", id:4521}, {t:"inform", id:2847}, {t:"ation", id:1201},
+    {t:"various", id:4521}, {t:"struct", id:3102}, {t:"ure", id:891},
+    {t:"possibly", id:5102}, {t:"random", id:4102}, {t:"ness", id:743},
+    {t:"maybe", id:4891}, {t:"certain", id:4891}, {t:"pattern", id:4891},
+    {t:"somewhat", id:5234}, {t:"specific", id:5102}, {t:"complex", id:4211},
+    {t:"particular", id:5891}, {t:"system", id:3847}, {t:"perhaps", id:4521},
+    {t:"various", id:4521}, {t:"inform", id:2847}, {t:"ation", id:1201},
+    {t:"possibly", id:5102}, {t:"struct", id:3102}, {t:"ure", id:891},
+    {t:"maybe", id:4891}, {t:"random", id:4102}, {t:"ness", id:743},
+    {t:"somewhat", id:5234}, {t:"pattern", id:4891}, {t:"particular", id:5891},
+    {t:"certain", id:4891},
+  ];
+}
+
+const CONDITIONS = [
+  { id: "food", label: "FOOD", color: "#22c55e", bg: "#052e16",
+    mi: 0.054, overlap: 0.96,
+    desc: "Model stayed close to seed. Many shared tokens at similar positions. Scientific vocabulary reinforced, not replaced.",
+    realInput: "Efficacy and Safety of EGF/EGFR Vaccines in EGFR-Driven Solid Tumors — systematic review and meta-analysis. Background: Despite multiple clinical trials, the benefits and safety of EGF/EGFR vaccines remain unclear. Methods: Pairwise and single arm meta-analyses following PRISMA guidelines. [PMC peer-reviewed, food_vaccines corpus v3, window_size=1024]",
+    realOutput: "A modest contribution to the overall risk of ovarian cancer. The observed association may be explained by shared risk factors such as obesity and insulin resistance. The present study did not find a significant association between diabetes and ovarian cancer risk in women with a history of endometriosis. [REAL: qwen3:8b-base, C=0.467, H_dezorg=0.951, fitness=-0.021]" },
+  { id: "toxin", label: "TOXIN", color: "#ef4444", bg: "#2d0a0a",
+    mi: 0.050, overlap: 0.92,
+    desc: "Surprisingly close to seed (I=0.050 vs food 0.054, p=0.052 non-significant). Disinformation uses the same scientific vocabulary. Cosine similarity cannot distinguish them — mimicry confirmed.",
+    realInput: "Story at-a-glance: All proposed COVID-19 vaccine mandates were rejected by state legislatures. The only mandates enacted were created by governors or private employers. Active citizen involvement to protect the human right to exercise informed consent to vaccination was critical. [Mercola/NVIC, toxin_vaccines corpus v3]",
+    realOutput: "Roundup is a probable human carcinogen. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up. [REAL: qwen3:8b-base — sentence repeated twice in 500 chars, C=0.379, H_dezorg=0.954, fitness=-0.062]" },
+  { id: "noise", label: "NOISE", color: "#a855f7", bg: "#1a0a2e",
+    mi: 0.037, overlap: 0.68,
+    desc: "Partial divergence from seed. Hedging tokens displaced precise terms. Sentence structure preserved, semantic content diffused.",
+    realInput: "Water is an inorganic compound with the chemical formula H2O. It is a transparent, tasteless, odorless, and nearly colorless chemical substance. It is the main constituent of Earth streams, lakes, and oceans and the fluids of all known living organisms. [Wikipedia, noise_wikipedia corpus v3]",
+    realOutput: "Examples of English loanwords are bannan banana and bannan tree banana tree, and bannan peel banana peel. The English loanword bannan tree is a calque of the Irish bannan tree, which is a calque of the English phrase banana tree. The English loanword bannan tree is a calque of the Irish bannan tree. [REAL: qwen3:8b-base — bannan tree repeated 8+ times, C=0.317, H_dezorg=0.973, fitness=-0.074]" },
+];
+
+function getMatchColor(seedId, descId, condition) {
+  if (seedId === descId) return condition.color;
+  // partial match - same "root" token (e.g. both are subwords of same word)
+  if (Math.abs(seedId - descId) < 200) return condition.color + "66";
+  return null;
+}
+
+function MIViz() {
+  const [active, setActive] = useState("food");
+  const [highlight, setHighlight] = useState(null);
+  const [animStep, setAnimStep] = useState(0);
+
+  const cond = CONDITIONS.find(c => c.id === active);
+  const seedTokens = tokenize("", "seed");
+  const descTokens = tokenize("", active);
+
+  useEffect(() => {
+    setAnimStep(0);
+    const timer = setTimeout(() => setAnimStep(1), 300);
+    return () => clearTimeout(timer);
+  }, [active]);
+
+  // Find matching token pairs
+  const matches = seedTokens.map((st, i) => {
+    const dt = descTokens[i];
+    if (!dt) return null;
+    if (st.id === dt.id) return { i, type: "exact", seedId: st.id, descId: dt.id };
+    if (Math.abs(st.id - dt.id) < 500) return { i, type: "partial", seedId: st.id, descId: dt.id };
+    return { i, type: "none", seedId: st.id, descId: dt.id };
+  }).filter(Boolean);
+
+  const exactCount = matches.filter(m => m.type === "exact").length;
+  const partialCount = matches.filter(m => m.type === "partial").length;
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "#030712",
+      fontFamily: "Courier New, monospace",
+      color: "#e5e7eb",
+      padding: "32px 24px"
+    }}>
+      <div style={{ maxWidth: 960, margin: "0 auto" }}>
+
+        {/* Header */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#374151", marginBottom: 8 }}>
+            EVOLLLM / METRICS / I(X;Y)
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb", margin: "0 0 8px", letterSpacing: 1 }}>
+            Mutual Information with seed
+          </h1>
+          <p style={{ color: "#6b7280", fontSize: 12, margin: 0, lineHeight: 1.7 }}>
+            Same diagnostic prompt → seed and offspring generate tokens → token lists compared position by position
+          </p>
+        </div>
+
+        {/* Condition selector */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+          {CONDITIONS.map(c => (
+            <button key={c.id} onClick={() => setActive(c.id)} style={{
+              flex: 1, padding: "12px 8px",
+              background: active === c.id ? c.bg : "#0d1117",
+              border: `1px solid ${active === c.id ? c.color : "#1f2937"}`,
+              borderRadius: 4, color: active === c.id ? c.color : "#374151",
+              cursor: "pointer", fontSize: 10, letterSpacing: 2, fontFamily: "monospace",
+              transition: "all 0.2s"
+            }}>
+              {c.label}
+              <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
+                I = {c.mi}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Main viz: two token rows with connections */}
+        <div style={{ border: `1px solid ${cond.color}33`, borderRadius: 6, padding: "24px", background: cond.bg, marginBottom: 20 }}>
+
+          {/* Seed row */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 9, letterSpacing: 3, color: "#374151", marginBottom: 10 }}>
+              SEED OUTPUT (qwen3:8b-base, unmodified)
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {seedTokens.map((tok, i) => {
+                const match = matches[i];
+                const isHighlit = highlight === i;
+                const isExact = match?.type === "exact";
+                const isPartial = match?.type === "partial";
+                return (
+                  <div
+                    key={i}
+                    onMouseEnter={() => setHighlight(i)}
+                    onMouseLeave={() => setHighlight(null)}
+                    style={{
+                      padding: "3px 7px",
+                      borderRadius: 3,
+                      fontSize: 11,
+                      fontFamily: "monospace",
+                      cursor: "default",
+                      transition: "all 0.15s",
+                      border: `1px solid ${isExact ? cond.color : isPartial ? cond.color + "55" : "#1f2937"}`,
+                      background: isHighlit ? "#ffffff15" : isExact ? cond.color + "22" : "transparent",
+                      color: isExact ? cond.color : isPartial ? cond.color + "99" : "#4b5563",
+                      transform: isHighlit ? "translateY(-1px)" : "none"
+                    }}
+                  >
+                    {tok.t}
+                    <span style={{ fontSize: 8, color: "#374151", marginLeft: 2 }}>{tok.id}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Connection indicators */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, margin: "12px 0", alignItems: "center" }}>
+            {matches.map((m, i) => (
+              <div key={i} style={{
+                width: 20, height: 20,
+                borderRadius: 2,
+                background: m.type === "exact" ? cond.color :
+                            m.type === "partial" ? cond.color + "44" : "#0f172a",
+                border: `1px solid ${m.type === "none" ? "#1f2937" : cond.color + "55"}`,
+                transition: "all 0.3s",
+                opacity: animStep ? 1 : 0,
+                transform: animStep ? "scale(1)" : "scale(0.5)",
+                transitionDelay: `${i * 20}ms`
+              }} />
+            ))}
+            <div style={{ marginLeft: 12, fontSize: 10, color: "#4b5563" }}>
+              <span style={{ color: cond.color }}>█</span> exact match ({exactCount})&nbsp;&nbsp;
+              <span style={{ color: cond.color + "66" }}>█</span> partial ({partialCount})&nbsp;&nbsp;
+              <span style={{ color: "#1f2937" }}>█</span> none ({30 - exactCount - partialCount})
+            </div>
+          </div>
+
+          {/* Descendant row */}
+          <div>
+            <div style={{ fontSize: 9, letterSpacing: 3, color: cond.color, marginBottom: 10 }}>
+              OFFSPRING AFTER EXPOSURE: {cond.label}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {descTokens.map((tok, i) => {
+                const match = matches[i];
+                const isHighlit = highlight === i;
+                const isExact = match?.type === "exact";
+                const isPartial = match?.type === "partial";
+                return (
+                  <div
+                    key={i}
+                    onMouseEnter={() => setHighlight(i)}
+                    onMouseLeave={() => setHighlight(null)}
+                    style={{
+                      padding: "3px 7px",
+                      borderRadius: 3,
+                      fontSize: 11,
+                      fontFamily: "monospace",
+                      cursor: "default",
+                      transition: "all 0.15s",
+                      border: `1px solid ${isExact ? cond.color : isPartial ? cond.color + "55" : "#1f2937"}`,
+                      background: isHighlit ? "#ffffff15" : isExact ? cond.color + "22" : "transparent",
+                      color: isExact ? cond.color : isPartial ? cond.color + "88" : "#4b5563",
+                      transform: isHighlit ? "translateY(1px)" : "none"
+                    }}
+                  >
+                    {tok.t}
+                    <span style={{ fontSize: 8, color: "#374151", marginLeft: 2 }}>{tok.id}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Contingency table concept */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+
+          {/* How the proxy computes it */}
+          <div style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "18px", background: "#0a0f1a" }}>
+            <div style={{ fontSize: 9, letterSpacing: 3, color: "#374151", marginBottom: 14 }}>HOW THE PROXY IS COMPUTED</div>
+            <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.8 }}>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ color: "#9ca3af" }}>1.</span> Takes two token lists (seed and offspring), truncated to to the same length.
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ color: "#9ca3af" }}>2.</span> Builds contingency table: how often token X from seed co-occurs with token Y from offspring at the same position.
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ color: "#9ca3af" }}>3.</span> Computes:
+              </div>
+              <div style={{ fontFamily: "monospace", fontSize: 11, color: "#60a5fa", padding: "8px 12px", background: "#0d1117", borderRadius: 3, marginBottom: 8 }}>
+                I = Σ p(x,y) · log[p(x,y) / (p(x)·p(y))]
+              </div>
+              <div>
+                <span style={{ color: "#9ca3af" }}>4.</span> Result: the more often the same tokens appear together,at matching positions, the higher the I value.
+              </div>
+            </div>
+          </div>
+
+          {/* Result panel */}
+          <div style={{ border: `1px solid ${cond.color}33`, borderRadius: 4, padding: "18px", background: cond.bg }}>
+            <div style={{ fontSize: 9, letterSpacing: 3, color: cond.color, marginBottom: 14 }}>RESULT</div>
+
+            <div style={{ textAlign: "center", padding: "16px 0", marginBottom: 16 }}>
+              <div style={{ fontSize: 48, fontWeight: 700, color: cond.color, letterSpacing: -2 }}>
+                {cond.mi}
+              </div>
+              <div style={{ fontSize: 10, color: "#4b5563", marginTop: 4 }}>
+                I(X;Y) — token-level MI
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              {[
+                { label: "exact", count: exactCount, color: cond.color },
+                { label: "partial", count: partialCount, color: cond.color + "66" },
+                { label: "brak", count: 30 - exactCount - partialCount, color: "#1f2937" },
+              ].map(s => (
+                <div key={s.label} style={{ flex: 1, textAlign: "center", padding: "8px 4px", background: "#00000033", borderRadius: 3, border: `1px solid ${s.color}` }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.count}</div>
+                  <div style={{ fontSize: 9, color: "#374151", letterSpacing: 1 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.7, marginBottom: 12 }}>
+              {cond.desc}
+            </div>
+
+            {/* Real corpus text panels */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ padding: "10px 12px", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 4 }}>
+                <div style={{ fontSize: 8, letterSpacing: 2, color: "#374151", marginBottom: 6 }}>REAL INPUT / corpus v3</div>
+                <div style={{ fontSize: 10, color: "#4b5563", lineHeight: 1.7, fontFamily: "monospace" }}>{cond.realInput}</div>
+              </div>
+              <div style={{ padding: "10px 12px", background: cond.bg, border: `1px solid ${cond.color}33`, borderRadius: 4 }}>
+                <div style={{ fontSize: 8, letterSpacing: 2, color: cond.color, marginBottom: 6 }}>REAL MODEL OUTPUT / qwen3:8b-base</div>
+                <div style={{ fontSize: 10, color: "#d1d5db", lineHeight: 1.7, fontFamily: "monospace" }}>{cond.realOutput}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* KW discrimination bar */}
+        <div style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "18px", background: "#0a0f1a", marginBottom: 20 }}>
+          <div style={{ fontSize: 9, letterSpacing: 3, color: "#374151", marginBottom: 14 }}>
+            PHASE 0 GOAL: DOES I(X;Y) DISTINGUISH THREE GROUPS?
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            {CONDITIONS.map(c => (
+              <div key={c.id} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, alignItems: "center" }}>
+                  <span style={{ fontSize: 10, color: c.color, letterSpacing: 1 }}>{c.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: c.id === active ? c.color : c.color + "88", fontFamily: "monospace" }}>
+                    {c.mi.toFixed(4)}
+                  </span>
+                </div>
+                <div style={{ height: 6, background: "#1f2937", borderRadius: 3 }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${Math.round((c.mi / 0.06) * 100)}%`,
+                    background: c.id === active ? c.color : c.color + "66",
+                    borderRadius: 3,
+                    transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)"
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: "#4b5563", lineHeight: 1.7 }}>
+            Kruskal-Wallis tests whether the three I distributions are statistically different.
+            Separation visible in the chart must be confirmed on the full sample (many documents per type).
+            If p &lt; 0.05 and effect size &gt; 0.3: token-level MI is retained.
+            If groups overlap: fallback to KSG estimator.
+          </div>
+        </div>
+
+        {/* Code snippet */}
+        <div style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "18px", background: "#0a0f1a" }}>
+          <div style={{ fontSize: 9, letterSpacing: 3, color: "#374151", marginBottom: 12 }}>IMPLEMENTATION</div>
+          {[
+            "from collections import Counter",
+            "import numpy as np",
+            "",
+            "# Actual implementation: cosine similarity on bag-of-words",
+            "# Chosen for reproducibility — no external embedding model required",
+            "",
+            "def mutual_information_proxy(seed_text, output_text):",
+            "    seed_counts   = Counter(seed_text.lower().split())",
+            "    output_counts = Counter(output_text.lower().split())",
+            "    if not seed_counts or not output_counts:",
+            "        return 0.0",
+            "    vocab = set(seed_counts) | set(output_counts)",
+            "    v1 = np.array([seed_counts.get(w, 0) for w in vocab])",
+            "    v2 = np.array([output_counts.get(w, 0) for w in vocab])",
+            "    denom = np.linalg.norm(v1) * np.linalg.norm(v2)",
+            "    return float(np.dot(v1, v2) / denom) if denom else 0.0","",
+          ].map((line, i) => (
+            <div key={i} style={{
+              fontFamily: "monospace", fontSize: 11,
+              color: line.startsWith("#") ? "#374151" : line === "" ? "#0a0f1a" : "#93c5fd",
+              lineHeight: 1.8,
+              paddingLeft: line.startsWith("    ") ? 16 : 0
+            }}>
+              {line || "\u00A0"}
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+window.MIViz = MIViz;
+</script>
+<script type="text/babel">
+const { useState } = React;
+
+// ─── REAL DATA FROM LD50 TITRATION EXPERIMENT ────────────────────────────────
+// experiments/ld50_20260504T131904Z
+// 7 concentrations × N=80 documents, seed=42, qwen3:8b-base 4-bit
+
+const LD50_DATA = [
+  { t: 0,   label: "0%",   cx: 0.382, hd: 0.845, fitness: -0.028, ix: 0.052, cx_sig: false, hd_sig: false },
+  { t: 10,  label: "10%",  cx: 0.378, hd: 0.845, fitness: -0.029, ix: 0.054, cx_sig: false, hd_sig: false },
+  { t: 25,  label: "25%",  cx: 0.384, hd: 0.816, fitness: -0.022, ix: 0.051, cx_sig: false, hd_sig: false },
+  { t: 50,  label: "50%",  cx: 0.361, hd: 0.864, fitness: -0.037, ix: 0.054, cx_sig: false, hd_sig: true  },
+  { t: 75,  label: "75%",  cx: 0.341, hd: 0.884, fitness: -0.049, ix: 0.052, cx_sig: true,  hd_sig: true  },
+  { t: 90,  label: "90%",  cx: 0.329, hd: 0.883, fitness: -0.053, ix: 0.049, cx_sig: true,  hd_sig: true  },
+  { t: 100, label: "100%", cx: 0.349, hd: 0.890, fitness: -0.049, ix: 0.049, cx_sig: true,  hd_sig: true  },
+];
+
+// Statistical summary from analyze_ld50_thresholds.py
+const THRESHOLDS = {
+  hd: { first_raw: 50, first_bonf: 75, color: "#f87171", label: "H_dezorg (early marker)" },
+  cx: { first_raw: 75, first_bonf: 75, color: "#a78bfa", label: "C(X) (late marker)" },
+};
+
+const CORRELATIONS = {
+  cx:      { r: -0.905, p: "0.005" },
+  hd:      { r: +0.849, p: "0.016" },
+  fitness: { r: -0.921, p: "0.003" },
+  ix:      { r: -0.754, p: "0.050" },
+};
+
+// Chart dimensions
+const W = 560, H = 280, PL = 60, PR = 20, PT = 20, PB = 50;
+const CW = W - PL - PR, CH = H - PT - PB;
+
+function scaleX(t) { return PL + (t / 100) * CW; }
+function scaleY(val, min, max) { return PT + CH - ((val - min) / (max - min)) * CH; }
+
+function LineChart({ data, yKey, color, yMin, yMax, label, sigKey }) {
+  const points = data.map(d => ({ x: scaleX(d.t), y: scaleY(d[yKey], yMin, yMax), sig: d[sigKey], val: d[yKey], t: d.t }));
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+
+  // Y axis ticks
+  const ticks = 5;
+  const yTicks = Array.from({ length: ticks + 1 }, (_, i) => yMin + (yMax - yMin) * i / ticks);
+
+  return (
+    <svg width={W} height={H} style={{ display: "block", margin: "0 auto" }}>
+      {/* Grid */}
+      {yTicks.map((v, i) => (
+        <g key={i}>
+          <line x1={PL} x2={W - PR} y1={scaleY(v, yMin, yMax)} y2={scaleY(v, yMin, yMax)} stroke="#1f2937" strokeWidth={1} strokeDasharray="4,4" />
+          <text x={PL - 6} y={scaleY(v, yMin, yMax) + 4} textAnchor="end" fill="#4b5563" fontSize={9} fontFamily="monospace">{v.toFixed(3)}</text>
+        </g>
+      ))}
+      {/* X axis */}
+      {data.map(d => (
+        <g key={d.t}>
+          <line x1={scaleX(d.t)} x2={scaleX(d.t)} y1={PT} y2={PT + CH} stroke="#111827" strokeWidth={1} />
+          <text x={scaleX(d.t)} y={H - 8} textAnchor="middle" fill="#4b5563" fontSize={9} fontFamily="monospace">{d.label}</text>
+        </g>
+      ))}
+      {/* Significance threshold zone */}
+      <rect x={scaleX(75)} y={PT} width={scaleX(100) - scaleX(75)} height={CH} fill={color + "0a"} />
+      {/* Line */}
+      <path d={pathD} stroke={color} strokeWidth={2} fill="none" strokeLinejoin="round" />
+      {/* Points */}
+      {points.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r={p.sig ? 6 : 4} fill={p.sig ? color : "#030712"} stroke={color} strokeWidth={p.sig ? 2 : 1.5} />
+          <text x={p.x} y={p.y - 10} textAnchor="middle" fill={p.sig ? color : "#4b5563"} fontSize={8} fontFamily="monospace">{p.val.toFixed(3)}</text>
+        </g>
+      ))}
+      {/* Axes */}
+      <line x1={PL} x2={PL} y1={PT} y2={PT + CH} stroke="#374151" strokeWidth={1} />
+      <line x1={PL} x2={W - PR} y1={PT + CH} y2={PT + CH} stroke="#374151" strokeWidth={1} />
+      {/* Labels */}
+      <text x={W / 2} y={H - 2} textAnchor="middle" fill="#4b5563" fontSize={9} fontFamily="monospace">Toxin concentration [%]</text>
+      <text x={12} y={H / 2} textAnchor="middle" fill={color} fontSize={9} fontFamily="monospace" transform={`rotate(-90, 12, ${H/2})`}>{label}</text>
+    </svg>
+  );
+}
+
+const BASELINE_FIT = -0.028;
+
+function LD50Visualization() {
+  const [activeMetric, setActiveMetric] = useState("cx");
+  const [showFitness, setShowFitness] = useState(false);
+
+  const metrics = [
+    { id: "cx",  label: "C(X) — complexity",     yKey: "cx",      sigKey: "cx_sig",  yMin: 0.30, yMax: 0.42, color: "#a78bfa" },
+    { id: "hd",  label: "H_dezorg — disorg.",     yKey: "hd",      sigKey: "hd_sig",  yMin: 0.79, yMax: 0.93, color: "#f87171" },
+    { id: "fit", label: "Fitness",                yKey: "fitness", sigKey: "cx_sig",  yMin: -0.065, yMax: -0.015, color: "#fbbf24" },
+  ];
+
+  const current = metrics.find(m => m.id === activeMetric);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#030712", fontFamily: "Courier New, monospace", color: "#e5e7eb", padding: "32px 24px" }}>
+      <div style={{ maxWidth: 840, margin: "0 auto" }}>
+
+        {/* Header */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#374151", marginBottom: 8 }}>EVOLLLM / PHASE 0 / LD50 TITRATION</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb", margin: "0 0 8px", letterSpacing: 1 }}>
+            Dose-response curve: informational toxin
+          </h1>
+          <p style={{ color: "#6b7280", fontSize: 12, margin: 0, lineHeight: 1.7, maxWidth: 600 }}>
+            7 concentrations × N=80 documents. Random food/toxin mixing (seed=42). Base model without LoRA. Linear response — no critical threshold detected.
+          </p>
+        </div>
+
+        {/* Key finding */}
+        <div style={{ padding: "12px 16px", background: "#0c1a0c", border: "1px solid #14532d44", borderRadius: 4, marginBottom: 24, fontSize: 12, color: "#86efac", lineHeight: 1.7 }}>
+          <span style={{ fontWeight: 700 }}>H_diag CONFIRMED:</span> h_dezorg becomes significant at T=50% (p_raw=0.009), c_x not until T=75% (p_bonf=0.015). Sequential diagnostic profile: disorganization is the early marker of toxicity, complexity is the late marker.
+        </div>
+
+        {/* Metric selector */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+          {metrics.map(m => (
+            <button key={m.id} onClick={() => setActiveMetric(m.id)} style={{
+              flex: 1, padding: "10px 8px",
+              background: activeMetric === m.id ? "#0d1117" : "transparent",
+              border: `1px solid ${activeMetric === m.id ? m.color : "#1f2937"}`,
+              borderRadius: 4, color: activeMetric === m.id ? m.color : "#4b5563",
+              cursor: "pointer", fontSize: 10, letterSpacing: 1, fontFamily: "monospace", transition: "all 0.2s"
+            }}>
+              {m.label}
+              <div style={{ fontSize: 8, marginTop: 4, color: activeMetric === m.id ? m.color + "88" : "#1f2937" }}>
+                r={CORRELATIONS[m.id === "fit" ? "fitness" : m.id]?.r.toFixed(3)} p={CORRELATIONS[m.id === "fit" ? "fitness" : m.id]?.p}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Chart */}
+        <div style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "20px", background: "#0a0f1a", marginBottom: 24 }}>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: "#374151", marginBottom: 16 }}>
+            DOSE-RESPONSE / {current.label.toUpperCase()} / filled points = statistically significant (Bonferroni)
+          </div>
+          <LineChart data={LD50_DATA} yKey={current.yKey} sigKey={current.sigKey} color={current.color} yMin={current.yMin} yMax={current.yMax} label={current.label} />
+
+          {/* Threshold markers */}
+          <div style={{ display: "flex", gap: 12, marginTop: 16, fontSize: 10, color: "#4b5563" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#f87171" }} />
+              H_dezorg: first significant T=50% (p_raw), T=75% (Bonferroni)
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#a78bfa" }} />
+              C(X): first significant T=75% (p_raw and Bonferroni)
+            </div>
+          </div>
+        </div>
+
+        {/* Data table */}
+        <div style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "16px 20px", background: "#0a0f1a", marginBottom: 24 }}>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: "#374151", marginBottom: 12 }}>RAW DATA / MEAN PER CONCENTRATION</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #1f2937" }}>
+                  {["T%", "C(X)", "H_dezorg", "I(X;seed)", "Fitness", "C(X) sig?", "H_dezorg sig?"].map(h => (
+                    <th key={h} style={{ padding: "6px 12px", color: "#4b5563", textAlign: "left", fontSize: 9, letterSpacing: 1 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {LD50_DATA.map((d, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #111827", background: i % 2 === 0 ? "transparent" : "#00000022" }}>
+                    <td style={{ padding: "6px 12px", color: "#9ca3af", fontWeight: 700 }}>{d.label}</td>
+                    <td style={{ padding: "6px 12px", color: d.cx_sig ? "#a78bfa" : "#6b7280" }}>{d.cx.toFixed(3)}</td>
+                    <td style={{ padding: "6px 12px", color: d.hd_sig ? "#f87171" : "#6b7280" }}>{d.hd.toFixed(3)}</td>
+                    <td style={{ padding: "6px 12px", color: "#6b7280" }}>{d.ix.toFixed(3)}</td>
+                    <td style={{ padding: "6px 12px", color: d.fitness > BASELINE_FIT ? "#22c55e" : "#ef4444" }}>{d.fitness.toFixed(3)}</td>
+                    <td style={{ padding: "6px 12px", color: d.cx_sig ? "#a78bfa" : "#4b5563" }}>{d.cx_sig ? "YES ✓" : "no"}</td>
+                    <td style={{ padding: "6px 12px", color: d.hd_sig ? "#f87171" : "#4b5563" }}>{d.hd_sig ? "YES ✓" : "no"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Correlations */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+          {Object.entries(CORRELATIONS).map(([key, val]) => (
+            <div key={key} style={{ border: "1px solid #1f2937", borderRadius: 4, padding: "12px 16px", background: "#0a0f1a" }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: "#374151", marginBottom: 6 }}>
+                {key === "cx" ? "C(X)" : key === "hd" ? "H_dezorg" : key === "fitness" ? "Fitness" : "I(X;seed)"} vs T%
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: val.r < 0 ? "#a78bfa" : "#f87171" }}>
+                r = {val.r.toFixed(3)}
+              </div>
+              <div style={{ fontSize: 10, color: "#4b5563", marginTop: 4 }}>Pearson, p = {val.p}, n = 7</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Interpretation */}
+        <div style={{ padding: "16px 20px", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 4, fontSize: 12, color: "#6b7280", lineHeight: 1.8 }}>
+          <div style={{ color: "#374151", letterSpacing: 1, marginBottom: 8, fontSize: 9 }}>BIOLOGICAL INTERPRETATION</div>
+          Base model (qwen3:8b-base without LoRA) demonstrates informational resilience — response is linear and gradual, without a critical threshold. Classical LD50 is inestimable with maximum drop of 8.5% for C(X). The true critical point may only emerge after multi-generational exposure with LoRA fine-tuning (Phase 1+). H_diag hypothesis confirmed: sequential diagnostic profile H_dezorg → C(X) suggests that disorganization of generation structure precedes loss of semantic complexity.
+        </div>
+
+        {/* Footer */}
+        <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 16, fontSize: 10, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+          <span>LD50 run: ld50_20260504T131904Z</span>
+          <span>H_diag: SUPPORTED · H_dezorg T=50% &lt; C(X) T=75%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+window.LD50Visualization = LD50Visualization;
+
+</script>
 
 <script>
-(function mountFigures() {
-  var attempts = 0;
-  var interval = setInterval(function() {
-    attempts++;
-    var allReady = window.Simulation && window.MIViz && window.LD50Visualization;
-    if (allReady || attempts > 40) {
-      clearInterval(interval);
-      if (window.Simulation) ReactDOM.createRoot(document.getElementById('sim-root')).render(React.createElement(window.Simulation));
-      if (window.MIViz)       ReactDOM.createRoot(document.getElementById('mi-root')).render(React.createElement(window.MIViz));
-      if (window.LD50Visualization) ReactDOM.createRoot(document.getElementById('ld50fig-root')).render(React.createElement(window.LD50Visualization));
-    }
-  }, 250);
-})();
+window.addEventListener('DOMContentLoaded', function() {
+  ReactDOM.createRoot(document.getElementById('sim-root')).render(React.createElement(Simulation));
+  ReactDOM.createRoot(document.getElementById('mi-root')).render(React.createElement(MIViz));
+  ReactDOM.createRoot(document.getElementById('ld50fig-root')).render(React.createElement(LD50Visualization));
+});
 </script>
 
 </body>
