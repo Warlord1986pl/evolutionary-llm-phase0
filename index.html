@@ -274,9 +274,9 @@
     <p style="color:#8b949e;font-size:.9rem;margin-bottom:1.5rem">All figures display real data from the canonical Phase 0 run and LD50 titration. Real corpus chunks and real model outputs from qwen3:8b-base.</p>
 
     <div class="figure-tabs">
-      <button class="fig-tab active" onclick="showFig('sim')">Exposure simulation</button>
-      <button class="fig-tab" onclick="showFig('mi')">Mutual information</button>
-      <button class="fig-tab" onclick="showFig('ld50fig')">LD50 dose-response</button>
+      <button class="fig-tab active" onclick="showFig('sim', this)">Exposure simulation</button>
+      <button class="fig-tab" onclick="showFig('mi', this)">Mutual information</button>
+      <button class="fig-tab" onclick="showFig('ld50', this)">LD50 dose-response</button>
     </div>
 
     <div id="fig-sim" class="fig-pane active">
@@ -354,11 +354,12 @@ new Chart(document.getElementById('ld50Chart'),{
   }}
 });
 
-function showFig(id){
+function showFig(id, btn){
   document.querySelectorAll('.fig-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.fig-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('fig-'+id).classList.add('active');
-  event.target.classList.add('active');
+  const pane = document.getElementById('fig-'+id);
+  if (pane) pane.classList.add('active');
+  if (btn) btn.classList.add('active');
 }
 
 document.querySelectorAll('nav a').forEach(a=>{
