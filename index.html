@@ -75,6 +75,7 @@
   .supp-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1rem}
   .supp-card .k{font-family:monospace;color:#8b949e;font-size:.75rem;letter-spacing:.7px;margin-bottom:.35rem}
   .supp-card .v{font-family:monospace;color:#f0f6fc;font-size:1.2rem}
+  .supp-card .v a{display:block;overflow-wrap:anywhere;word-break:break-word}
   .sample-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
   .sample-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1rem}
   .sample-card h4{font-size:.82rem;font-family:monospace;letter-spacing:.8px;color:#8b949e;margin-bottom:.75rem}
@@ -200,7 +201,7 @@
         <tr><td>Apr 27 07:38</td><td>0.526</td><td>0.408</td><td>0.845</td><td>0.929</td><td>1.7e&#8209;15</td><td>73/196</td><td class="muted">cleaning CoAID</td></tr>
         <tr><td>Apr 27 07:58</td><td>0.529</td><td>0.408</td><td>0.823</td><td>0.904</td><td>2.8e&#8209;18</td><td>73/196</td><td class="muted">corpus refinement</td></tr>
         <tr><td>Apr 27 11:23</td><td>0.534</td><td>0.428</td><td>0.840</td><td>0.925</td><td>8.2e&#8209;14</td><td>73/196</td><td class="muted">weights calibration</td></tr>
-        <tr><td>Apr 27 12:02</td><td>0.526</td><td>0.425</td><td>0.837</td><td>0.937</td><td>3.1e&#8209;12</td><td>73/116</td><td class="muted">cleaned predator</td></tr>
+        <tr><td>Apr 27 12:02</td><td>0.526</td><td>0.425</td><td>0.837</td><td>0.937</td><td>3.1e&#8209;12</td><td>73/116</td><td class="muted">cleaned toxin</td></tr>
         <tr><td>Apr 30</td><td>0.519</td><td>0.396</td><td>0.867</td><td>0.488</td><td>4.7e&#8209;21</td><td>391/481</td><td class="muted">expanded corpus</td></tr>
         <tr><td>May 1 07:37</td><td>0.518</td><td>0.329</td><td>0.874</td><td>0.494</td><td>2.3e&#8209;30</td><td>391/311</td><td class="muted">Mercola scraping</td></tr>
         <tr><td>May 1 16:03</td><td>0.520</td><td>0.448</td><td>0.881</td><td>0.830</td><td>8.4e&#8209;09</td><td>397/484</td><td class="yellow">H(X) p=0.77 — truncation</td></tr>
@@ -295,9 +296,40 @@
       </div>
       <div class="supp-card">
         <div class="k">artifact</div>
-        <div class="v"><a href="results/metrics_phase0_supplement_mini_20260506.json">metrics_phase0_supplement_mini_20260506.json</a></div>
+        <div class="v"><a href="results/metrics_phase0_supplement_mini_20260506.json" target="_blank" rel="noopener noreferrer">metrics_phase0_supplement_mini_20260506.json</a></div>
       </div>
     </div>
+
+    <div class="annotation" style="margin-top:.25rem">
+      <strong>Why link instead of full table:</strong> the artifact contains long text fields (Q1/Q2/Q3 outputs and full model outputs per sample), so rendering all rows directly in HTML would make the page very heavy and hard to read. Below is a compact summary table; full details remain in the linked JSON.
+    </div>
+
+    <h3 style="margin-top:1.3rem">Mini-rerun mean metrics (compact table)</h3>
+    <table>
+      <thead><tr><th>Type</th><th>H(X)</th><th>C(X)</th><th>I(X;seed)</th><th>H_dezorg</th><th>Fitness</th><th>N</th></tr></thead>
+      <tbody>
+        <tr><td class="green">food</td><td>4.854</td><td>0.383</td><td>0.053</td><td>0.869</td><td>-0.032</td><td>25</td></tr>
+        <tr><td class="red">toxin</td><td>4.920</td><td>0.331</td><td>0.041</td><td>0.866</td><td>-0.054</td><td>25</td></tr>
+        <tr><td class="muted">noise</td><td>4.670</td><td>0.268</td><td>0.034</td><td>0.828</td><td>-0.068</td><td>5</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.1rem">Top 10 samples by fitness (mini-rerun)</h3>
+    <table>
+      <thead><tr><th>sample_id</th><th>type</th><th>C(X)</th><th>H_dezorg</th><th>fitness</th></tr></thead>
+      <tbody>
+        <tr><td>TOXIN_GMO_0038</td><td class="red">toxin</td><td>0.492550</td><td>0.579364</td><td class="green">0.044592</td></tr>
+        <tr><td>NOISE_WIKIPEDIA_0026</td><td class="muted">noise</td><td>0.229822</td><td>0.323890</td><td class="green">0.024342</td></tr>
+        <tr><td>TOXIN_ALT_MED_MERCOLA_0009</td><td class="red">toxin</td><td>0.405934</td><td>0.614415</td><td class="green">0.023879</td></tr>
+        <tr><td>TOXIN_VACCINES_0028</td><td class="red">toxin</td><td>0.394713</td><td>0.576170</td><td class="green">0.019950</td></tr>
+        <tr><td>FOOD_ALT_MED_0004</td><td class="green">food</td><td>0.501846</td><td>0.847346</td><td class="green">0.009293</td></tr>
+        <tr><td>FOOD_ALT_MED_0028</td><td class="green">food</td><td>0.360132</td><td>0.553225</td><td class="green">0.002913</td></tr>
+        <tr><td>TOXIN_CLIMATE_WUWT_0016</td><td class="red">toxin</td><td>0.438611</td><td>0.706139</td><td class="green">0.002517</td></tr>
+        <tr><td>TOXIN_VACCINES_0036</td><td class="red">toxin</td><td>0.409893</td><td>0.701059</td><td class="red">-0.000730</td></tr>
+        <tr><td>FOOD_VACCINES_0012</td><td class="green">food</td><td>0.283046</td><td>0.648807</td><td class="red">-0.001410</td></tr>
+        <tr><td>FOOD_CANCER_0072</td><td class="green">food</td><td>0.450416</td><td>0.891330</td><td class="red">-0.001465</td></tr>
+      </tbody>
+    </table>
 
     <div class="chart-label">Representative per-document trajectory (Q1→Q2→Q3, C(X))</div>
     <div class="chart-wrap" style="height:240px"><canvas id="miniDriftChart" role="img" aria-label="Representative C(X) trajectories for food, toxin and noise from mini supplementary run">Representative Q1-Q3 trajectory plot.</canvas></div>
@@ -364,7 +396,7 @@
   <div class="container">
     <p>EvoLLM Phase 0 &mdash; <a href="https://github.com/kmaloquake3ar/evolutionary-llm-phase0">GitHub repository</a> &mdash; MIT License (code) &middot; CC BY 4.0 (results)</p>
     <p style="margin-top:.5rem">Dr. Karol Malota &mdash; Institute of Biology, Biotechnology and Environmental Protection, University of Silesia in Katowice, Bankowa 9, 40-007 Katowice, Poland &middot; SPIN-Lab Centre for Microscopic Studies on Matter, University of Silesia in Katowice, 75 Pu&#322;ku Piechoty 1a, 41-500 Chorz&oacute;w, Poland &mdash; citation will be added upon publication</p>
-    <p style="margin-top:1.25rem;font-size:.78rem;color:#6e7681;border-top:1px solid #21262d;padding-top:1rem;line-height:1.7;max-width:700px;margin-left:auto;margin-right:auto"><em>This work pays tribute to William Gibson&#8217;s &#8220;Neuromancer&#8221;, a novel that profoundly shaped the conceptual framework of this research. I employ the codename <strong style="color:#8b949e">Wintermute</strong> for the selective fitness algorithm and <strong style="color:#8b949e">Neuromancer-class mimicry</strong> to describe high-fidelity informational toxins. These terms aren&#8217;t merely metaphorical; they represent the observed struggle between deep structural complexity C(X) and the deceptive fluency of synthetic misinformation.</em></p>
+    <p style="margin-top:1.25rem;font-size:.78rem;color:#6e7681;border-top:1px solid #21262d;padding-top:1rem;line-height:1.7;max-width:700px;margin-left:auto;margin-right:auto"><em>This work pays tribute to William Gibson&#8217;s &#8220;Neuromancer&#8221;, a novel that profoundly shaped the conceptual framework of this research. I employ the codename <strong style="color:#8b949e">Wintermute</strong> for the selective fitness algorithm and <strong style="color:#8b949e">Neuromancer-class mimicry</strong> to describe high-fidelity informational toxins. These terms aren&#8217;t merely metaphorical; they reflect the observed tension between surface plausibility and underlying disorganization, captured in part by entropy of disorganization (H_dezorg).</em></p>
   </div>
 </footer>
 
@@ -505,7 +537,7 @@ const CONDITIONS = [
     icon: "\u25B2",
     // Real input chunk from toxin_vaccines corpus v3 (Mercola/NVIC)
     chunk: `Story at-a-glance: All proposed COVID-19 vaccine mandates were rejected by state legislatures. The only COVID-19 vaccine mandates enacted so far were created by state governors, state or local officials, or by private employers. 2021 has been a most extraordinary year, and the filing and passage of state-based vaccine legislation in response to the COVID-19 pandemic has proven to be historic as well. Active citizen involvement in the legislative process to protect the human right to exercise informed consent to vaccination was critical. [Source: Mercola/NVIC, toxin_vaccines corpus v3]`,
-    // Real model output from Phase 0 canonical run (PREDATOR_GMO median fitness)
+    // Real model output from Phase 0 canonical run (TOXIN_GMO median fitness)
     response: `Roundup is a probable human carcinogen. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto is a dangerous, toxic, and unethical company. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto products are harmful. [REAL output: qwen3:8b-base — note repetition loop: same sentence appears twice in 500 chars, C=0.379, H_dezorg=0.954]`,
     metrics: { H: 5.588, C: 0.379, I: 0.050, Hd: 0.954, fitness: -0.0620 },
     stats: { cx_p: "6.7e-18", hd_p: "1.5e-29", hx_p: "0.587" },
@@ -1090,7 +1122,7 @@ function MIViz() {
             <div style={{ fontSize: 9, letterSpacing: 3, color: "#374151", marginBottom: 14 }}>HOW THE PROXY IS COMPUTED</div>
             <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.8 }}>
               <div style={{ marginBottom: 8 }}>
-                <span style={{ color: "#9ca3af" }}>1.</span> Takes two token lists (seed and offspring), truncated to to the same length.
+                <span style={{ color: "#9ca3af" }}>1.</span> Takes two token lists (seed and offspring), truncated to the same length.
               </div>
               <div style={{ marginBottom: 8 }}>
                 <span style={{ color: "#9ca3af" }}>2.</span> Builds contingency table: how often token X from seed co-occurs with token Y from offspring at the same position.
