@@ -5,6 +5,63 @@ Chronological log of work sessions, decisions, and progress.
 
 ---
 
+## 2026-05-06 — Supplementary mini-rerun, freeze tag, and public dissemination
+
+### Context
+
+Canonical Phase 0 statistics were already finalized on full corpus (N=880), but
+qualitative Q1/Q2/Q3 generated texts were missing for supplementary presentation.
+Goal of this session: produce a small, controlled rerun with saved chunk texts,
+separate supplementary artifacts from canonical claims, and update public site.
+
+### Actions performed
+
+- Built mini supplementary corpus and config.
+
+  - `data/v2_mini_v3/` created with 55 docs (food=25, toxin=25, noise=5)
+  - `config/phase0_mini_rerun_v3_toxin.yaml` created
+  - naming normalized to `toxin` in mini corpus metadata
+
+- Executed mini rerun for chunk text evidence.
+
+  - output: `experiments/phase0_metrics_20260506T083113Z/metrics_phase0.json`
+  - run validated with criterion `p < 0.05` satisfied
+  - verified presence of `gen_text_Q1`, `gen_text_Q2`, `gen_text_Q3`
+
+- Formalized freeze point and publication split.
+
+  - public repo (`evolutionary-llm-phase0`) tagged at canonical checkpoint: `v0.1-phase0`
+  - tag points to commit used as frozen Phase 0 reference
+  - supplementary committed separately to avoid altering canonical claims
+
+- Updated public Phase 0 website/repo artifacts.
+
+  - supplementary JSON published in public repo results directory
+  - website section for supplementary drift evidence added
+  - README in public repo split into canonical vs supplementary narrative
+
+### Key decision
+
+Mini-rerun is explicitly classified as **qualitative supplementary evidence**, not
+inferential replacement. All statistical claims remain anchored to canonical
+full-corpus run (N=880).
+
+### Environment/runtime lessons
+
+- Attempt via Windows `.venv` failed due missing `unsloth`.
+- Correct execution path for this workload: WSL2 conda env (`evollm-wsl`/`evolllm`
+  depending on local naming), launched from project root mounted under `/mnt/e/...`.
+
+### Files created/updated in this session (research repo)
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `data/v2_mini_v3/*` | Created | Mini supplementary corpus (55 docs) |
+| `config/phase0_mini_rerun_v3_toxin.yaml` | Created | Mini-rerun config with `save_chunk_texts: true` |
+| `experiments/phase0_metrics_20260506T083113Z/metrics_phase0.json` | Created | Supplementary output with Q1/Q2/Q3 texts |
+
+---
+
 ## 2026-04-22 — Session 1: Pre-0 Environment Setup & Metric Definitions
 
 ### Context

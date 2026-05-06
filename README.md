@@ -72,3 +72,11 @@ See environment architecture decision details in `ENVIRONMENT_ARCHITECTURE.md`.
 
 - Keep experiments reproducible: fixed random seeds and full parameter logging.
 - Do not pass content-type tags (food/toxin/noise) to model inputs.
+
+## Latest update (2026-05-06)
+
+- Mini-rerun for qualitative drift evidence completed on reduced set (N=55).
+- Sample counts: food=25, toxin=25, noise=5.
+- Run output with Q1/Q2/Q3 generated texts: experiments/phase0_metrics_20260506T083113Z/metrics_phase0.json.
+- Purpose of mini-rerun: qualitative supplementary evidence only (trajectory examples), not replacement for canonical Phase 0 statistics from the full N=880 run.
+- Public Phase 0 repository was updated with supplementary artifact and website section.

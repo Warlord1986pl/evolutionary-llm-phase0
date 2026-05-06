@@ -1,3 +1,9 @@
+# EvoLLM — Notatki robocze (running research log)
+
+*Bieżące ustalenia metodologiczne, decyzje i obserwacje. Pełne wnioski per sesja w osobnych plikach.*
+
+---
+
 ## Sesja 2026-05-04 — zamknięcie Phase 0
 
 **LD50 zakończony.** Odpowiedź gradualna i liniowa, brak progu krytycznego. Model bazowy odporny na titrację. LD50 klasyczne nieestymowalne — to jest wynik, nie błąd.
@@ -13,11 +19,27 @@
 **Odporność pipeline na nieoptymalny seed:** przypadkowo zweryfikowana — c_x i h_dezorg stabilne niezależnie od seed_text. I(X;seed) słabe we wszystkich 3 runach.
 
 **Terminologia:** predator → toxin (zatruwa, nie poluje). Spójne z LD50, metabolic decay, dose-response.
-# EvoLLM — Notatki robocze (running research log)
-
-*Bieżące ustalenia metodologiczne, decyzje i obserwacje. Pełne wnioski per sesja w osobnych plikach.*
 
 ---
+
+## Sesja 2026-05-06 — mini-rerun pod materiał supplementary
+
+**Cel:** domknąć brakujące evidence jakościowe dryfu Q1/Q2/Q3 bez ruszania canonical run N=880.
+
+**Co zrobiono:**
+- utworzono mini-korpus `data/v2_mini_v3/` (55 dokumentów: food=25, toxin=25, noise=5),
+- dodano konfigurację `config/phase0_mini_rerun_v3_toxin.yaml` z `save_chunk_texts: true`,
+- uruchomiono mini-rerun i zapisano wynik: `experiments/phase0_metrics_20260506T083113Z/metrics_phase0.json`,
+- potwierdzono obecność pól `gen_text_Q1`, `gen_text_Q2`, `gen_text_Q3` dla dokumentów.
+
+**Wniosek metodologiczny:**
+- dryf ilościowy był już policzony wcześniej na pełnym korpusie,
+- mini-rerun służy wyłącznie do ilustracji jakościowej (przykładowe trajektorie i excerpty),
+- nie nadpisuje canonical wniosków statystycznych Phase 0.
+
+**Repo/publication workflow:**
+- publiczne repo Phase 0 oznaczono tagiem zamrażającym `v0.1-phase0`,
+- supplementary opublikowano jako osobny artefakt i sekcję na stronie, aby oddzielić canonical od dodatków.
 
 ## Sesja 2026-04-22 — kluczowe ustalenia
 

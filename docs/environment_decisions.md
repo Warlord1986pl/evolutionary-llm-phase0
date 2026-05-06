@@ -59,3 +59,11 @@ Ollama removed because qwen3:8b-base is not available in Ollama registry. Replac
 ## 2026-04-27 — Ollama removed from config
 
 Ollama removed from config: inference_backend changed from ollama to unsloth. Generation parameters locked: temperature=0.0, do_sample=false, seed=42 for deterministic outputs.
+
+## 2026-05-06 — Supplementary rerun execution policy confirmed
+
+- Mini-rerun for qualitative evidence was executed from WSL2 conda environment because Windows `.venv` lacked `unsloth`.
+- Repository mount for this workstation was validated as `/mnt/e/github/Evolutionary LLM Research`.
+- Canonical and supplementary outputs are now explicitly separated by run purpose:
+  - canonical inferential claims: full N=880 run,
+  - supplementary qualitative evidence: mini N=55 run with saved `gen_text_Q1/Q2/Q3`.

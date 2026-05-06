@@ -38,3 +38,9 @@ pip install unsloth accelerate peft trl datasets sentence-transformers
 - `python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"` returns `True` and CUDA 12.x.
 - `python -c "import unsloth; print('ok')"` completes without crash in WSL2.
 - Training smoke run (single mini-batch) executes on GPU.
+
+## Operational note (2026-05-06)
+
+- If a Phase 0/mini-rerun command fails in Windows `.venv` with missing `unsloth`, run it from WSL2 conda environment.
+- Use repository path mounted under `/mnt/e/...` (not `/mnt/host/e/...` in this setup).
+- Keep canonical statistics runs and supplementary qualitative reruns in separate output directories for clear provenance.
