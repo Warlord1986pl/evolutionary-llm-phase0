@@ -66,7 +66,7 @@ def effective_complexity(text: str) -> float:
 
     raw = text.encode("utf-8")
     compressed = gzip.compress(raw)
-    return len(compressed) / len(raw)
+    return min(len(compressed) / len(raw), 1.0)
 
 
 def fitness_score(
