@@ -1,0 +1,125 @@
+{
+  "description": "Shapiro-Wilk normality test, Phase 0 canonical metrics",
+  "results": [
+    {
+      "metric": "h_x",
+      "type": "food",
+      "n": 400,
+      "shapiro_W": 0.913969,
+      "shapiro_p": 2.526779410202773e-14,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "h_x",
+      "type": "predator",
+      "n": 400,
+      "shapiro_W": 0.990341,
+      "shapiro_p": 0.009979477777740475,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "h_x",
+      "type": "noise",
+      "n": 80,
+      "shapiro_W": 0.991319,
+      "shapiro_p": 0.8716948143340184,
+      "normal_at_0.05": true
+    },
+    {
+      "metric": "c_x",
+      "type": "food",
+      "n": 400,
+      "shapiro_W": 0.162085,
+      "shapiro_p": 1.2269802595012873e-38,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "c_x",
+      "type": "predator",
+      "n": 400,
+      "shapiro_W": 0.982851,
+      "shapiro_p": 0.00011080060191132477,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "c_x",
+      "type": "noise",
+      "n": 80,
+      "shapiro_W": 0.969089,
+      "shapiro_p": 0.049656716458827715,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "i_x_seed",
+      "type": "food",
+      "n": 400,
+      "shapiro_W": 0.970504,
+      "shapiro_p": 3.123224204234636e-07,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "i_x_seed",
+      "type": "predator",
+      "n": 400,
+      "shapiro_W": 0.953544,
+      "shapiro_p": 6.627198478255441e-10,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "i_x_seed",
+      "type": "noise",
+      "n": 80,
+      "shapiro_W": 0.963074,
+      "shapiro_p": 0.02078544470000113,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "h_dezorg",
+      "type": "food",
+      "n": 400,
+      "shapiro_W": 0.783419,
+      "shapiro_p": 1.1524510864663997e-22,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "h_dezorg",
+      "type": "predator",
+      "n": 400,
+      "shapiro_W": 0.677992,
+      "shapiro_p": 6.949549848823412e-27,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "h_dezorg",
+      "type": "noise",
+      "n": 80,
+      "shapiro_W": 0.606069,
+      "shapiro_p": 2.5112143377897135e-13,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "fitness",
+      "type": "food",
+      "n": 400,
+      "shapiro_W": 0.254979,
+      "shapiro_p": 4.5008453240773865e-37,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "fitness",
+      "type": "predator",
+      "n": 400,
+      "shapiro_W": 0.979985,
+      "shapiro_p": 2.44638169383788e-05,
+      "normal_at_0.05": false
+    },
+    {
+      "metric": "fitness",
+      "type": "noise",
+      "n": 80,
+      "shapiro_W": 0.895711,
+      "shapiro_p": 8.063896767845794e-06,
+      "normal_at_0.05": false
+    }
+  ]
+}
