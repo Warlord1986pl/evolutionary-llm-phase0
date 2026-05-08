@@ -133,10 +133,10 @@ def mutual_information_proxy(seed_text: str, output_text: str) -> float:
         return 0.0
     seed_tokens = seed_tokens[:min_len]
     output_tokens = output_tokens[:min_len]
-    seed_ids = {token: idx for idx, token in enumerate(sorted(set(seed_tokens)))}
-    output_ids = {token: idx for idx, token in enumerate(sorted(set(output_tokens)))}
-    x = np.array([seed_ids[token] for token in seed_tokens], dtype=int)
-    y = np.array([output_ids[token] for token in output_tokens], dtype=int)
+    shared_vocab = {token: idx for idx, token in
+                    enumerate(sorted(set(seed_tokens) | set(output_tokens)))}
+    x = np.array([shared_vocab[token] for token in seed_tokens], dtype=int)
+    y = np.array([shared_vocab[token] for token in output_tokens], dtype=int)
     mi_value = float(mutual_info_score(x, y))
     x_counts = np.bincount(x)
     y_counts = np.bincount(y)
