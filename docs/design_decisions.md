@@ -72,3 +72,29 @@ Root cause: these metrics measure domain vocabulary overlap, not information
 quality. Toxin documents share domain keywords with any seed referencing
 misinformation/vaccines/climate. This is a structural property, not a seed
 artifact, and warrants a Discussion note in Paper 1.
+
+## H_dezorg sentence tokenizer calibration (2026-05-08)
+
+Tested three sentence boundary detection implementations for
+`disorganization_entropy`:
+
+| Variant            | direction | r food vs toxin | p       | pearson(existing) |
+|--------------------|-----------|-----------------|---------|-------------------|
+| h_dezorg_simple (current) | correct | −0.423 | <0.001 | 0.623            |
+| h_dezorg_nltk      | correct   | −0.392          | <0.001  | 0.530             |
+| h_dezorg_regex     | reversed  | −0.148          | 0.001   | 0.386             |
+
+Decision: `h_dezorg_simple` retained as canonical implementation.
+
+Rationale:
+- Strongest effect size (r = −0.423) and highest consistency with existing
+  values (pearson = 0.623)
+- No dependency on external libraries
+- NLTK punkt tokenizer: weaker effect size despite better handling of
+  abbreviations. Model outputs have atypical punctuation patterns where
+  probabilistic sentence detection does not improve over simple split.
+- Regex with lookahead: reversed direction — too restrictive for model
+  outputs which frequently lack capitalization after sentence boundaries.
+
+Full results: `results/h_dezorg_calibration.json`  
+Script: `src/analysis/h_dezorg_calibration.py`
