@@ -41,7 +41,7 @@ from src.evolution.population import (
 # level would pull in unsloth (which requires a GPU) and break non-GPU
 # environments used for data pipeline, analysis, and testing.
 # Functions that need GPU call:
-#   from src.evolution.trainer import load_adapter, measure_metrics, train_adapter
+#   from src.evolution.trainer import train_adapter, train_and_measure
 
 log = logging.getLogger(__name__)
 
@@ -645,7 +645,7 @@ def run_biome(
         Base RNG seed; each generation uses ``seed + generation``.
     """
     import torch  # noqa: F401 — torch is imported early for memory management
-    from src.evolution.trainer import train_adapter  # noqa: F401 — lazy to avoid unsloth GPU check at import time
+    from src.evolution.trainer import train_and_measure  # noqa: F401 — lazy to avoid unsloth GPU check at import time
 
     config_path_obj = Path(config_path)
     with open(config_path_obj, encoding="utf-8") as fh:
@@ -746,20 +746,19 @@ def run_biome(
                     creation_timestamp=now_utc_iso(),
                 )
 
-                adapter_path = train_adapter(
+                adapter_path, metrics = train_and_measure(
                     documents=doc_slice,
                     parent_adapter_path=None,
                     output_dir=gen_adapter_dir,
                     agent_id=agent_id,
                     metadata=metadata,
                     config=config,
-                )
-
-                metrics, output_text = _measure_agent(
-                    adapter_path=adapter_path,
-                    base_model_name=base_model_name,
+                    diagnostic_prompt=DIAGNOSTIC_PROMPT,
                     seed_output=seed_output,
+                    fitness_weights=_FITNESS_WEIGHTS,
+                    base_model_name=base_model_name,
                 )
+                output_text = str(metrics.pop("output_text"))
                 agent_outputs[agent_id] = output_text
 
                 # Update metadata with measured fitness
@@ -807,20 +806,19 @@ def run_biome(
                     creation_timestamp=now_utc_iso(),
                 )
 
-                adapter_path = train_adapter(
+                adapter_path, metrics = train_and_measure(
                     documents=doc_slice,
                     parent_adapter_path=state.adapter_path,
                     output_dir=gen_adapter_dir,
                     agent_id=agent_id,
                     metadata=metadata,
                     config=config,
-                )
-
-                metrics, output_text = _measure_agent(
-                    adapter_path=adapter_path,
-                    base_model_name=base_model_name,
+                    diagnostic_prompt=DIAGNOSTIC_PROMPT,
                     seed_output=seed_output,
+                    fitness_weights=_FITNESS_WEIGHTS,
+                    base_model_name=base_model_name,
                 )
+                output_text = str(metrics.pop("output_text"))
                 agent_outputs[agent_id] = output_text
 
                 updated_state = AgentState(
@@ -898,20 +896,19 @@ def run_biome(
                 creation_timestamp=now_utc_iso(),
             )
 
-            offspring_adapter_path = train_adapter(
+            offspring_adapter_path, offspring_metrics = train_and_measure(
                 documents=offspring_doc_slice,
                 parent_adapter_path=parent_state.adapter_path,
                 output_dir=offspring_gen_dir,
                 agent_id=offspring_id,
                 metadata=offspring_metadata,
                 config=config,
-            )
-
-            offspring_metrics, offspring_text = _measure_agent(
-                adapter_path=offspring_adapter_path,
-                base_model_name=base_model_name,
+                diagnostic_prompt=DIAGNOSTIC_PROMPT,
                 seed_output=seed_output,
+                fitness_weights=_FITNESS_WEIGHTS,
+                base_model_name=base_model_name,
             )
+            offspring_text = str(offspring_metrics.pop("output_text"))
 
             population = register_offspring(
                 population=population,
@@ -1028,64 +1025,6 @@ def _agent_doc_slice(
         return pool[start:end]
     # Wrap around
     return pool[start:] + pool[: end - len(pool)]
-
-
-def _measure_agent(
-    adapter_path: str,
-    base_model_name: str,
-    seed_output: str,
-) -> tuple[dict, str]:
-    """Load adapter, generate diagnostic output, measure metrics, unload.
-
-    Releases GPU memory unconditionally before returning.
-
-    Parameters
-    ----------
-    adapter_path : str
-        Path to the adapter directory.
-    base_model_name : str
-        Unsloth 4-bit base model name.
-    seed_output : str
-        Reference seed text for the I(X;seed) proxy.
-
-    Returns
-    -------
-    tuple[dict, str]
-        ``(metrics_dict, generated_output_text)``
-    """
-    import torch
-    from src.evolution.trainer import load_adapter, measure_metrics  # lazy import — requires GPU/unsloth
-
-    model, tokenizer = load_adapter(adapter_path, base_model_name)
-    try:
-        metrics = measure_metrics(
-            model=model,
-            tokenizer=tokenizer,
-            diagnostic_prompt=DIAGNOSTIC_PROMPT,
-            seed_output=seed_output,
-            fitness_weights=_FITNESS_WEIGHTS,
-        )
-        # Re-generate to capture the raw output text for JSD computation.
-        inputs = tokenizer(DIAGNOSTIC_PROMPT, return_tensors="pt").to(model.device)
-        prompt_len = inputs["input_ids"].shape[1]
-        with torch.no_grad():
-            output_ids = model.generate(
-                **inputs,
-                max_new_tokens=200,
-                temperature=0.0,
-                do_sample=False,
-            )
-        output_text: str = tokenizer.decode(
-            output_ids[0][prompt_len:], skip_special_tokens=True
-        )
-    finally:
-        del model
-        del tokenizer
-        gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-
-    return metrics, output_text
 
 
 def _next_agent_index(population: Population) -> int:

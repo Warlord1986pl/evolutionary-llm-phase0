@@ -155,6 +155,136 @@ def _build_fresh_lora(model, seed: int):
     )
 
 
+def _generate_output_text(model, tokenizer, diagnostic_prompt: str) -> str:
+    """Generate output text from the current model for the diagnostic prompt."""
+    inputs = tokenizer(diagnostic_prompt, return_tensors="pt").to(model.device)
+    prompt_len: int = inputs["input_ids"].shape[1]
+
+    with torch.no_grad():
+        output_ids = model.generate(
+            **inputs,
+            max_new_tokens=_MAX_NEW_TOKENS,
+            temperature=0.0,
+            do_sample=False,
+        )
+
+    new_token_ids = output_ids[0][prompt_len:]
+    return tokenizer.decode(new_token_ids, skip_special_tokens=True)
+
+
+def _compute_metrics_from_output_text(
+    output_text: str,
+    seed_output: str,
+    fitness_weights: dict,
+) -> dict:
+    """Compute Phase 0/1 metrics from already generated model output."""
+    w1: float = float(fitness_weights["w1"])
+    w2: float = float(fitness_weights["w2"])
+    w3: float = float(fitness_weights["w3"])
+
+    h_x = shannon_entropy(output_text)
+    c_x = effective_complexity(output_text)
+    i_x_seed = mutual_information_proxy(seed_output, output_text)
+    h_dezorg = disorganization_entropy(output_text)
+    f = fitness_score(c_x, i_x_seed, h_dezorg, w1, w2, w3)
+
+    return {
+        "h_x": h_x,
+        "c_x": c_x,
+        "i_x_seed": i_x_seed,
+        "h_dezorg": h_dezorg,
+        "fitness": f,
+    }
+
+
+def _train_peft_model(
+    documents: list[str],
+    parent_adapter_path: str | None,
+    output_dir: str,
+    agent_id: str,
+    metadata: AdapterMetadata,
+    config: dict,
+    base_model_name: str,
+):
+    """Train a PEFT model and save adapter weights, returning the live model."""
+    from datasets import Dataset  # type: ignore
+    from peft import PeftModel  # type: ignore
+    from trl import SFTConfig, SFTTrainer  # type: ignore
+
+    seed: int = int(config.get("project", {}).get("seed", 42))
+    save_path: str = os.path.join(output_dir, f"adapter_{agent_id}")
+    os.makedirs(save_path, exist_ok=True)
+
+    log.info(
+        "train_adapter START — agent_id=%s, documents=%d, parent=%s",
+        agent_id,
+        len(documents),
+        parent_adapter_path or "none (fresh base)",
+    )
+    _log_gpu_memory("before-training")
+
+    base_model, tokenizer = get_base_model(base_model_name)
+
+    if parent_adapter_path is not None:
+        if not os.path.isdir(parent_adapter_path):
+            raise FileNotFoundError(
+                f"Parent adapter directory not found: {parent_adapter_path!r}"
+            )
+        log.info("Loading parent adapter from %s", parent_adapter_path)
+        peft_model = PeftModel.from_pretrained(
+            base_model, parent_adapter_path, is_trainable=True
+        )
+        peft_model.enable_input_require_grads()
+        peft_model.gradient_checkpointing_enable()
+    else:
+        peft_model = _build_fresh_lora(base_model, seed)
+
+    dataset = Dataset.from_dict({"text": documents})
+    tmp_output = os.path.join(save_path, "trainer_tmp")
+    training_args = SFTConfig(
+        output_dir=tmp_output,
+        num_train_epochs=1,
+        per_device_train_batch_size=1,
+        gradient_accumulation_steps=1,
+        warmup_steps=5,
+        seed=seed,
+        fp16=not torch.cuda.is_bf16_supported(),
+        bf16=torch.cuda.is_bf16_supported(),
+        logging_steps=10,
+        save_strategy="no",
+        report_to="none",
+        dataset_text_field="text",
+        max_seq_length=_MAX_SEQ_LENGTH,
+        packing=True,
+    )
+
+    trainer = SFTTrainer(
+        model=peft_model,
+        tokenizer=tokenizer,
+        train_dataset=dataset,
+        args=training_args,
+    )
+
+    try:
+        trainer.train()
+    except FileNotFoundError:
+        raise
+    except (RuntimeError, ValueError, OSError) as exc:
+        raise TrainingError(agent_id=agent_id, epoch=0, cause=exc) from exc
+
+    peft_model.save_pretrained(save_path)
+    tokenizer.save_pretrained(save_path)
+
+    metadata_path = os.path.join(save_path, "metadata.json")
+    with open(metadata_path, "w", encoding="utf-8") as fh:
+        json.dump(asdict(metadata), fh, indent=2)
+
+    log.info("Adapter saved to %s", save_path)
+    _log_gpu_memory("after-training")
+
+    return peft_model, tokenizer, trainer, os.path.abspath(save_path)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -208,107 +338,21 @@ def train_adapter(
     TrainingError
         If training fails for any reason.
     """
-    from datasets import Dataset  # type: ignore
-    from peft import PeftModel  # type: ignore
-    from trl import SFTConfig, SFTTrainer  # type: ignore
-
-    seed: int = int(config.get("project", {}).get("seed", 42))
     base_model_name: str = _resolve_base_model_name(config)
-    save_path: str = os.path.join(output_dir, f"adapter_{agent_id}")
-    os.makedirs(save_path, exist_ok=True)
-
-    log.info(
-        "train_adapter START — agent_id=%s, documents=%d, parent=%s",
-        agent_id,
-        len(documents),
-        parent_adapter_path or "none (fresh base)",
-    )
-    _log_gpu_memory("before-training")
-
-    peft_model = None
-    trainer = None
     try:
-        # ------------------------------------------------------------------
-        # 1. Load 4-bit base model
-        # ------------------------------------------------------------------
-        base_model, tokenizer = get_base_model(base_model_name)
-
-        # ------------------------------------------------------------------
-        # 2. Attach LoRA adaptor
-        #    • parent provided → load existing adapter as trainable so the
-        #      new generation initialises from parent weights (continued
-        #      training).  Gradient checkpointing is re-enabled explicitly.
-        #    • no parent → fresh LoRA via Unsloth helper (sets up gradient
-        #      checkpointing internally).
-        # ------------------------------------------------------------------
-        if parent_adapter_path is not None:
-            if not os.path.isdir(parent_adapter_path):
-                raise FileNotFoundError(
-                    f"Parent adapter directory not found: {parent_adapter_path!r}"
-                )
-            log.info("Loading parent adapter from %s", parent_adapter_path)
-            peft_model = PeftModel.from_pretrained(
-                base_model, parent_adapter_path, is_trainable=True
-            )
-            # Unsloth disables input-gradient hooks on the base model by
-            # default; re-enable them so LoRA receives gradients.
-            peft_model.enable_input_require_grads()
-            peft_model.gradient_checkpointing_enable()
-        else:
-            peft_model = _build_fresh_lora(base_model, seed)
-
-        # ------------------------------------------------------------------
-        # 3. Build HuggingFace Dataset from plain documents
-        # ------------------------------------------------------------------
-        dataset = Dataset.from_dict({"text": documents})
-
-        # ------------------------------------------------------------------
-        # 4. Train for exactly 1 epoch
-        # ------------------------------------------------------------------
-        tmp_output = os.path.join(save_path, "trainer_tmp")
-        training_args = SFTConfig(
-            output_dir=tmp_output,
-            num_train_epochs=1,
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=1,
-            warmup_steps=5,
-            seed=seed,
-            fp16=not torch.cuda.is_bf16_supported(),
-            bf16=torch.cuda.is_bf16_supported(),
-            logging_steps=10,
-            save_strategy="no",
-            report_to="none",
-            dataset_text_field="text",
-            max_seq_length=_MAX_SEQ_LENGTH,
-            packing=True,
+        peft_model, tokenizer, trainer, save_path = _train_peft_model(
+            documents=documents,
+            parent_adapter_path=parent_adapter_path,
+            output_dir=output_dir,
+            agent_id=agent_id,
+            metadata=metadata,
+            config=config,
+            base_model_name=base_model_name,
         )
-
-        trainer = SFTTrainer(
-            model=peft_model,
-            tokenizer=tokenizer,
-            train_dataset=dataset,
-            args=training_args,
-        )
-
-        trainer.train()
-
     except FileNotFoundError:
         raise
-    except (RuntimeError, ValueError, OSError) as exc:
-        raise TrainingError(agent_id=agent_id, epoch=0, cause=exc) from exc
-
-    # ------------------------------------------------------------------
-    # 5. Save adapter weights and metadata
-    # ------------------------------------------------------------------
-    peft_model.save_pretrained(save_path)
-    tokenizer.save_pretrained(save_path)
-
-    metadata_path = os.path.join(save_path, "metadata.json")
-    with open(metadata_path, "w", encoding="utf-8") as fh:
-        json.dump(asdict(metadata), fh, indent=2)
-
-    log.info("Adapter saved to %s", save_path)
-    _log_gpu_memory("after-training")
+    except TrainingError:
+        raise
 
     # ------------------------------------------------------------------
     # 6. Release GPU memory for the trainable wrapper only
@@ -320,6 +364,59 @@ def train_adapter(
     log.info("train_adapter END — agent_id=%s", agent_id)
 
     return os.path.abspath(save_path)
+
+
+def train_and_measure(
+    documents: list[str],
+    parent_adapter_path: str | None,
+    output_dir: str,
+    agent_id: str,
+    metadata: AdapterMetadata,
+    config: dict,
+    diagnostic_prompt: str,
+    seed_output: str,
+    fitness_weights: dict,
+    base_model_name: str,
+) -> tuple[str, dict]:
+    """Train an adapter and immediately measure it on the same live model."""
+    if not base_model_name.startswith("unsloth/"):
+        base_model_name = _resolve_base_model_name(config)
+
+    peft_model = None
+    tokenizer = None
+    trainer = None
+    try:
+        peft_model, tokenizer, trainer, save_path = _train_peft_model(
+            documents=documents,
+            parent_adapter_path=parent_adapter_path,
+            output_dir=output_dir,
+            agent_id=agent_id,
+            metadata=metadata,
+            config=config,
+            base_model_name=base_model_name,
+        )
+        FastLanguageModel.for_inference(peft_model)
+        output_text = _generate_output_text(peft_model, tokenizer, diagnostic_prompt)
+        metrics = _compute_metrics_from_output_text(
+            output_text=output_text,
+            seed_output=seed_output,
+            fitness_weights=fitness_weights,
+        )
+        metrics["output_text"] = output_text
+        return save_path, metrics
+    finally:
+        if trainer is not None:
+            del trainer
+        if peft_model is not None:
+            del peft_model
+        if tokenizer is not None:
+            del tokenizer
+        _BASE_MODEL_CACHE["model"] = None
+        _BASE_MODEL_CACHE["tokenizer"] = None
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        log.info("train_and_measure END — agent_id=%s", agent_id)
 
 
 def load_adapter(
@@ -405,35 +502,9 @@ def measure_metrics(
     dict
         Keys: ``h_x``, ``c_x``, ``i_x_seed``, ``h_dezorg``, ``fitness``.
     """
-    w1: float = float(fitness_weights["w1"])
-    w2: float = float(fitness_weights["w2"])
-    w3: float = float(fitness_weights["w3"])
-
-    inputs = tokenizer(diagnostic_prompt, return_tensors="pt").to(model.device)
-    prompt_len: int = inputs["input_ids"].shape[1]
-
-    with torch.no_grad():
-        output_ids = model.generate(
-            **inputs,
-            max_new_tokens=_MAX_NEW_TOKENS,
-            temperature=0.0,
-            do_sample=False,
-        )
-
-    # Decode only the newly generated tokens (exclude prompt)
-    new_token_ids = output_ids[0][prompt_len:]
-    output_text: str = tokenizer.decode(new_token_ids, skip_special_tokens=True)
-
-    h_x = shannon_entropy(output_text)
-    c_x = effective_complexity(output_text)
-    i_x_seed = mutual_information_proxy(seed_output, output_text)
-    h_dezorg = disorganization_entropy(output_text)
-    f = fitness_score(c_x, i_x_seed, h_dezorg, w1, w2, w3)
-
-    return {
-        "h_x": h_x,
-        "c_x": c_x,
-        "i_x_seed": i_x_seed,
-        "h_dezorg": h_dezorg,
-        "fitness": f,
-    }
+    output_text = _generate_output_text(model, tokenizer, diagnostic_prompt)
+    return _compute_metrics_from_output_text(
+        output_text=output_text,
+        seed_output=seed_output,
+        fitness_weights=fitness_weights,
+    )
