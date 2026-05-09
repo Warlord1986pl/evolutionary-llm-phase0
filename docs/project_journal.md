@@ -172,6 +172,116 @@ this corpus and warrants a Discussion note in Paper 1.
 
 ---
 
+## 2026-05-09 — Phase 0 v2 complete, Phase 1 ready
+
+### Context
+
+Phase 0 rerun (tag `phase0-final-v2`) completed with frozen metrics
+(mi_token_ids_nmi + Seed C). Canonical run: `phase0_metrics_20260508T140551Z`.
+All statistical thresholds met. Phase 1 parameters recalibrated and frozen.
+Phase 1 infrastructure confirmed ready.
+
+### Phase 0 v2 — final results
+
+**Canonical run:** `phase0_metrics_20260508T140551Z`  
+**Metrics frozen:** `mi_token_ids_nmi` + Seed C  
+**Tag:** `phase0-final-v2`
+
+**Mean metrics per content type:**
+
+| Type  | H(X)  | C(X)  | I(X;seed) | H_dezorg | fitness |
+|-------|-------|-------|-----------|----------|---------|
+| food  | 4.949 | 0.393 | 0.806     | 0.825    | +0.356  |
+| toxin | 5.061 | 0.331 | 0.772     | 0.907    | +0.304  |
+| noise | 4.690 | 0.295 | 0.752     | 0.888    | +0.287  |
+
+**Pairwise food vs toxin (Mann-Whitney U, rank-biserial r):**
+
+| Metric     | r      | p        | sig |
+|------------|--------|----------|-----|
+| H(X)       | +0.035 | 0.398    | ns  |
+| C(X)       | −0.373 | 7.3e-20  | *** |
+| I(X;seed)  | −0.358 | 2.0e-18  | *** |
+| H_dezorg   | +0.487 | 8.4e-33  | *** |
+| Fitness    | −0.465 | 5.0e-30  | *** |
+
+Note: H(X) ns confirms toxin mimicry of surface entropy. C(X), I, H_dezorg, fitness all discriminate.
+
+**LD50 gradient (Pearson r, n=7 titration points):**
+
+| Metric     | r      | p     |
+|------------|--------|-------|
+| C(X)       | −0.936 | 0.002 |
+| H_dezorg   | +0.869 | 0.011 |
+| I(X;seed)  | −0.887 | 0.008 |
+| fitness    | −0.961 | 0.001 |
+
+Critical threshold: T=50% (all metrics simultaneously significant).  
+Non-monotonic finding: C(X) compensation at T=25%; H_dezorg suppression at T=0–25%.
+
+**Per-domain significance:**
+
+| Metric    | Domains significant | Notes               |
+|-----------|--------------------|--------------------|
+| H_dezorg  | 5/5               | climate, vaccines, alt_med, cancer, gmo |
+| Fitness   | 5/5               | all domains         |
+| C(X)      | 4/5               | cancer ns           |
+| I(X;seed) | 3/5               | cancer, alt_med ns  |
+
+**Metabolic cost finding:**
+
+H_dezorg/C(X) ratio: food=2.197, toxin=3.041, noise=3.184.  
+Toxin processing incurs 38% higher computational cost per unit of useful complexity.  
+Energy budget mechanism proposed for Phase 2 in `docs/design_decisions.md`.
+
+**Publication figures:** generated in `papers/phase0/figures_publication/generated/`.
+
+### Phase 1 — parameters frozen and ready
+
+| Parameter           | Value                                                          |
+|---------------------|----------------------------------------------------------------|
+| Model               | qwen3:8b-base (no LoRA)                                       |
+| Population          | 10 agents per biome                                           |
+| Documents per agent | 30 per generation                                             |
+| Generations         | 35+                                                           |
+| Inheritance         | Option B (fine-tune on biome documents)                       |
+| fitness_threshold   | 0.3156 (mean_pop from Phase 0 v2)                             |
+| k_rep               | 13.30 (2× reproduction advantage food over toxin)             |
+| beta_death          | 0.072 (P_death toxin=0.15, food=0.00)                         |
+
+Start command:
+```
+python3 -m src.evolution.cli run \
+  --biome savanna --generations 35 --agents 10 --docs-per-agent 30 \
+  --config config/phase1_single_model.yaml \
+  --output-dir experiments/phase1/ \
+  --corpus-manifest data/v2/corpus_manifest_v3.json
+```
+
+### Phase status after this session
+
+| Phase | Status | Note |
+|-------|--------|------|
+| Phase 0 | **COMPLETE** | Tag `phase0-final-v2`, canonical run `phase0_metrics_20260508T140551Z` |
+| Phase 1 infrastructure | **COMPLETE** | trainer.py, population.py, biome_runner.py, cli.py ready |
+| Phase 1 experiment | **READY** | Savanna biome first; recalibrate k/β after generation 5 if needed |
+
+### Pending before Phase 1 start
+
+- [ ] Update project notes file for Claude Project
+- [ ] Run savanna biome first
+- [ ] Recalibrate k and beta after generation 5 if needed
+
+### Files created / updated
+
+| File | Action | Notes |
+|------|--------|-------|
+| `docs/project_journal.md` | Updated | This entry |
+| `EvoLLM_notatki_robocze.md` | Updated | Session 2026-05-09 summary |
+| `papers/phase0/figures_publication/generated/` | Created | Publication figures |
+
+---
+
 ## 2026-05-06 — Supplementary mini-rerun, freeze tag, and public dissemination
 
 ### Context

@@ -22,6 +22,31 @@
 
 ---
 
+## Sesja 2026-05-09 — Phase 0 v2 domknięty, Phase 1 ready
+
+**Canonical run zamrożony:** `phase0_metrics_20260508T140551Z`, tag `phase0-final-v2`.
+
+**Wyniki Phase 0 v2 — mean metryki:**
+- food:  H=4.949 C=0.393 I=0.806 H_dezorg=0.825 fitness=+0.356
+- toxin: H=5.061 C=0.331 I=0.772 H_dezorg=0.907 fitness=+0.304
+- noise: H=4.690 C=0.295 I=0.752 H_dezorg=0.888 fitness=+0.287
+
+**Pairwise food vs toxin:** H(X) ns (r=0.035, mimikra potwierdzona). C(X) r=-0.373 ***, I r=-0.358 ***, H_dezorg r=0.487 ***, fitness r=-0.465 ***.
+
+**Gradient LD50:** C(X) r=-0.936 p=0.002, H_dezorg r=0.869 p=0.011, I r=-0.887 p=0.008, fitness r=-0.961 p=0.001. Próg krytyczny T=50%.
+
+**Niemonotoniczność:** kompensacja C(X) przy T=25%, supresja H_dezorg przy T=0-25%.
+
+**Per-domain:** H_dezorg i fitness significant 5/5 domen. C(X) 4/5 (cancer ns). I(X;seed) 3/5 (cancer, alt_med ns).
+
+**Koszt metaboliczny:** H_dezorg/C(X) food=2.197, toxin=3.041. Toksyna 38% droższa per jednostkę użytecznej złożoności → mechanizm energy budget dla Phase 2.
+
+**Phase 1 parametry zamrożone:** fitness_threshold=0.3156, k_rep=13.30, beta_death=0.072. Moduły src/evolution/ gotowe (trainer, population, biome_runner, cli). Start: biom savanna, 35+ generacji, 10 agentów, 30 dokumentów/agent/gen.
+
+**Pending:** update notes Claude Project, rekalibacja k/β po generacji 5 jeśli potrzebna.
+
+---
+
 ## Sesja 2026-05-07 — domknięcie decyzji i start rerunu po zmianie MI
 
 - Phase 0 closed: commits `5834c53`, `c1d2cd3`, tag `phase0-final`.
