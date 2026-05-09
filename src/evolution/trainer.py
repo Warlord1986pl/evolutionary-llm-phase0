@@ -92,7 +92,11 @@ def _resolve_base_model_name(config: dict) -> str:
 
 
 def get_base_model(base_model_name: str) -> tuple:
-    """Load the base model once and return the cached model/tokenizer pair."""
+    """Load the base model once and return the cached model/tokenizer pair.
+
+    If the cached model has a PEFT config (left over from previous training),
+    unload it to restore a pristine state before returning.
+    """
     global _BASE_MODEL_CACHE
 
     if _BASE_MODEL_CACHE["model"] is None:
@@ -105,6 +109,17 @@ def get_base_model(base_model_name: str) -> tuple:
         _BASE_MODEL_CACHE["model"] = model
         _BASE_MODEL_CACHE["tokenizer"] = tokenizer
         log.info("Base model loaded and cached: %s", base_model_name)
+    else:
+        # If the cached model has PEFT layers from a prior training session,
+        # unload them to restore a pristine base before reuse.
+        cached_model = _BASE_MODEL_CACHE["model"]
+        if (
+            hasattr(cached_model, "peft_config")
+            and cached_model.peft_config is not None
+            and len(cached_model.peft_config) > 0
+        ):
+            log.info("Unloading PEFT adapter from cached base model before reuse")
+            cached_model.unload()
 
     return _BASE_MODEL_CACHE["model"], _BASE_MODEL_CACHE["tokenizer"]
 
@@ -291,11 +306,9 @@ def train_adapter(
     _log_gpu_memory("after-training")
 
     # ------------------------------------------------------------------
-    # 6. Detach the trainable wrapper and keep the pristine base in cache
+    # 6. Release GPU memory for the trainable wrapper only
+    #    The cached base model remains; it will be cleaned on next get_base_model()
     # ------------------------------------------------------------------
-    if peft_model is not None and hasattr(peft_model, "unload"):
-        _BASE_MODEL_CACHE["model"] = peft_model.unload()
-
     del trainer
     del peft_model
     torch.cuda.empty_cache()
