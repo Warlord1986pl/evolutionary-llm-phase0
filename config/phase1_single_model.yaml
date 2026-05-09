@@ -1,41 +1,41 @@
-project:
-  name: evolutionary-llm-research
-  phase: 1
-  seed: 42
-
-model:
-  base_model: qwen3:8b-base
-  inference_backend: ollama
-  lora_backend: unsloth
-
 biomes:
-  savanna:
-    food: 0.60
-    toxin: 0.20
-    noise: 0.20
-    k_max: 30
   desert:
-    food: 0.10
-    toxin: 0.70
-    noise: 0.20
+    food: 0.1
     k_max: 10
+    noise: 0.2
+    toxin: 0.7
   plain:
-    food: 0.80
-    toxin: 0.05
-    noise: 0.15
+    food: 0.8
     k_max: 25
-
+    noise: 0.15
+    toxin: 0.05
+  savanna:
+    food: 0.6
+    k_max: 30
+    noise: 0.2
+    toxin: 0.2
+constraints:
+  pass_content_type_tags_to_model: false
+  phase_mechanics_isolated: true
+mechanics:
+  beta_death: 0.072
+  cannibalism_enabled: false
+  fitness_threshold: 0.3156
+  hgt_enabled: false
+  k_rep: 13.3
+  recalibration_note: parameters subject to empirical recalibration after generation
+    5
+  reproduction_enabled: false
 metrics:
   weights:
     w1_complexity: 1.0
     w2_mutual_info: 1.0
     w3_disorganization: 1.0
-
-mechanics:
-  reproduction_enabled: false
-  hgt_enabled: false
-  cannibalism_enabled: false
-
-constraints:
-  pass_content_type_tags_to_model: false
-  phase_mechanics_isolated: true
+model:
+  base_model: qwen3:8b-base
+  inference_backend: ollama
+  lora_backend: unsloth
+project:
+  name: evolutionary-llm-research
+  phase: 1
+  seed: 42
