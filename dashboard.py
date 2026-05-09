@@ -221,11 +221,19 @@ def infer_total_docs_from_configs(config_dir='config'):
     if yaml is None:
         return None
 
-    config_candidates = sorted(
-        glob.glob(os.path.join(config_dir, 'phase0*.yaml')),
-        key=os.path.getmtime,
-        reverse=True,
-    )
+    # Build candidate list: prefer phase0_v3.yaml, then others (excluding ld50)
+    candidates = []
+    v3_path = os.path.join(config_dir, 'phase0_v3.yaml')
+    if os.path.exists(v3_path):
+        candidates.append(v3_path)
+    
+    # Add other phase0*.yaml configs sorted by mtime, but skip ld50 variants
+    other_configs = [
+        p for p in glob.glob(os.path.join(config_dir, 'phase0*.yaml'))
+        if p != v3_path and 'ld50' not in os.path.basename(p)
+    ]
+    candidates.extend(sorted(other_configs, key=os.path.getmtime, reverse=True))
+    config_candidates = candidates
 
     for config_path in config_candidates:
         try:
@@ -234,19 +242,22 @@ def infer_total_docs_from_configs(config_dir='config'):
         except Exception:
             continue
 
+        # Skip if run_tag contains 'ld50' (defensive check)
+        run_tag = config.get('project', {}).get('run_tag', '')
+        if 'ld50' in run_tag:
+            continue
+
         corpus_files = config.get('phase0_validation', {}).get('corpus_files', [])
         if not corpus_files:
             continue
 
         total_docs = 0
-        found_any = False
         for corpus_file in corpus_files:
             normalized = os.path.normpath(corpus_file)
             if os.path.exists(normalized):
                 total_docs += count_jsonl_records(normalized)
-                found_any = True
 
-        if found_any and total_docs > 0:
+        if total_docs > 0:
             return total_docs
 
     return None
@@ -470,14 +481,60 @@ if in_progress:
     processed = len(prog_lines)
     total_docs = in_progress['total_docs']
 
+    # Calculate ETA from run_id timestamp and entire run elapsed time
+    eta_str = "--"
+    if processed > 0 and total_docs and total_docs > processed:
+        try:
+            # Parse run_id: format is like "20260508T111411Z"
+            run_id = in_progress['run_id']
+            if len(run_id) >= 15 and 'T' in run_id:
+                # Extract timestamp part (20260508T111411Z)
+                ts_part = run_id.split('_')[0] if '_' in run_id else run_id
+                if len(ts_part) >= 15:
+                    # Parse: YYYYMMDDTHHMMSSZ
+                    year = int(ts_part[0:4])
+                    month = int(ts_part[4:6])
+                    day = int(ts_part[6:8])
+                    hour = int(ts_part[9:11])
+                    minute = int(ts_part[11:13])
+                    second = int(ts_part[13:15])
+                    
+                    from datetime import datetime, timezone
+                    run_start = datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+                    run_start_ts = run_start.timestamp()
+                    now_ts = time.time()
+                    
+                    elapsed = max(now_ts - run_start_ts, 0.1)  # Avoid division by zero
+                    rate = processed / elapsed  # docs per second for entire run
+                    
+                    if rate > 0:
+                        remaining_docs = total_docs - processed
+                        eta_seconds = remaining_docs / rate
+                        
+                        # Format as "Xh Ym" or "Ym Zs" or "Zs"
+                        if eta_seconds >= 3600:
+                            hours = int(eta_seconds // 3600)
+                            minutes = int((eta_seconds % 3600) // 60)
+                            eta_str = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+                        elif eta_seconds >= 60:
+                            minutes = int(eta_seconds // 60)
+                            seconds = int(eta_seconds % 60)
+                            eta_str = f"{minutes}m {seconds}s" if seconds > 0 else f"{minutes}m"
+                        else:
+                            eta_str = f"{int(eta_seconds)}s"
+        except Exception:
+            # If parsing fails, leave eta_str as "--"
+            pass
+
     # Progress bar
     if total_docs and total_docs > 0:
         pct = min(1.0, processed / total_docs)
-        pc1, pc2, pc3 = st.columns([3, 1, 1])
+        pc1, pc2, pc3, pc4 = st.columns([3, 1, 1, 1])
         with pc1:
             st.progress(pct, text=f"Processing: {processed}/{total_docs} documents ({pct*100:.1f}%)")
         pc2.markdown(tile_html("PROCESSED", str(processed), "docs", 'var(--blue)'), unsafe_allow_html=True)
         pc3.markdown(tile_html("REMAINING", str(max(0, total_docs - processed)), "docs"), unsafe_allow_html=True)
+        pc4.markdown(tile_html("ETA", eta_str, "", 'var(--yellow)'), unsafe_allow_html=True)
     else:
         st.info(f"Progressive log: {processed} documents processed (total unknown — add total_docs to config.json)")
 
@@ -702,7 +759,9 @@ if kw:
     kw_labels = {'h_x': 'H(X)', 'c_x': 'C(X)', 'i_x_seed': 'I(X;seed)', 'jaccard': 'Jaccard'}
     gauge_cols = st.columns(len(kw))
     for col, (metric, res) in zip(gauge_cols, kw.items()):
-        pval = res['p']
+        pval = res.get('p')
+        if pval is None:
+            continue
         neg_log_p = min(-np.log10(max(pval, 1e-16)), 16)
         is_sig = pval < 0.05
         bar_color = '#00ff88' if is_sig else '#ff3c3c'
