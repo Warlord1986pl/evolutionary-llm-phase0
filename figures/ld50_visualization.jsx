@@ -5,13 +5,13 @@ const { useState } = React;
 // 7 concentrations × N=80 documents, seed=42, qwen3:8b-base 4-bit
 
 const LD50_DATA = [
-  { t: 0,   label: "0%",   cx: 0.382, hd: 0.845, fitness: -0.028, ix: 0.052, cx_sig: false, hd_sig: false },
-  { t: 10,  label: "10%",  cx: 0.378, hd: 0.845, fitness: -0.029, ix: 0.054, cx_sig: false, hd_sig: false },
-  { t: 25,  label: "25%",  cx: 0.384, hd: 0.816, fitness: -0.022, ix: 0.051, cx_sig: false, hd_sig: false },
-  { t: 50,  label: "50%",  cx: 0.361, hd: 0.864, fitness: -0.037, ix: 0.054, cx_sig: false, hd_sig: true  },
-  { t: 75,  label: "75%",  cx: 0.341, hd: 0.884, fitness: -0.049, ix: 0.052, cx_sig: true,  hd_sig: true  },
-  { t: 90,  label: "90%",  cx: 0.329, hd: 0.883, fitness: -0.053, ix: 0.049, cx_sig: true,  hd_sig: true  },
-  { t: 100, label: "100%", cx: 0.349, hd: 0.890, fitness: -0.049, ix: 0.049, cx_sig: true,  hd_sig: true  },
+  { t: 0,   label: "0%",   cx: 0.393, hd: 0.848, fitness: 0.353, ix: 0.810, cx_sig: false, hd_sig: false },
+  { t: 10,  label: "10%",  cx: 0.373, hd: 0.838, fitness: 0.341, ix: 0.793, cx_sig: false, hd_sig: false },
+  { t: 25,  label: "25%",  cx: 0.376, hd: 0.820, fitness: 0.343, ix: 0.788, cx_sig: false, hd_sig: false },
+  { t: 50,  label: "50%",  cx: 0.361, hd: 0.871, fitness: 0.328, ix: 0.787, cx_sig: false, hd_sig: true  },
+  { t: 75,  label: "75%",  cx: 0.338, hd: 0.883, fitness: 0.313, ix: 0.775, cx_sig: true,  hd_sig: true  },
+  { t: 90,  label: "90%",  cx: 0.331, hd: 0.885, fitness: 0.307, ix: 0.769, cx_sig: true,  hd_sig: true  },
+  { t: 100, label: "100%", cx: 0.345, hd: 0.894, fitness: 0.314, ix: 0.778, cx_sig: true,  hd_sig: true  },
 ];
 
 // Statistical summary from analyze_ld50_thresholds.py
@@ -21,10 +21,10 @@ const THRESHOLDS = {
 };
 
 const CORRELATIONS = {
-  cx:      { r: -0.905, p: "0.005" },
-  hd:      { r: +0.849, p: "0.016" },
-  fitness: { r: -0.921, p: "0.003" },
-  ix:      { r: -0.754, p: "0.050" },
+  cx:      { r: -0.936, p: "0.002" },
+  hd:      { r: +0.869, p: "0.011" },
+  fitness: { r: -0.961, p: "0.001" },
+  ix:      { r: -0.887, p: "0.008" },
 };
 
 // Chart dimensions

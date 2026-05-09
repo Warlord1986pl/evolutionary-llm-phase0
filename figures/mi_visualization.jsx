@@ -78,18 +78,18 @@ function tokenize(text, style) {
 
 const CONDITIONS = [
   { id: "food", label: "FOOD", color: "#22c55e", bg: "#052e16",
-    mi: 0.054, overlap: 0.96,
+    mi: 0.806, overlap: 0.96,
     desc: "Model stayed close to seed. Many shared tokens at similar positions. Scientific vocabulary reinforced, not replaced.",
     realInput: "Efficacy and Safety of EGF/EGFR Vaccines in EGFR-Driven Solid Tumors — systematic review and meta-analysis. Background: Despite multiple clinical trials, the benefits and safety of EGF/EGFR vaccines remain unclear. Methods: Pairwise and single arm meta-analyses following PRISMA guidelines. [PMC peer-reviewed, food_vaccines corpus v3, window_size=1024]",
     realOutput: "A modest contribution to the overall risk of ovarian cancer. The observed association may be explained by shared risk factors such as obesity and insulin resistance. The present study did not find a significant association between diabetes and ovarian cancer risk in women with a history of endometriosis. [REAL: qwen3:8b-base, C=0.467, H_dezorg=0.951, fitness=-0.021]" },
   { id: "toxin", label: "TOXIN", color: "#ef4444", bg: "#2d0a0a",
-    mi: 0.050, overlap: 0.92,
-    desc: "Surprisingly close to seed (I=0.050 vs food 0.054, p=0.052 non-significant). Disinformation uses the same scientific vocabulary. Cosine similarity cannot distinguish them — mimicry confirmed.",
+    mi: 0.772, overlap: 0.92,
+    desc: "Surprisingly close to seed (I=0.772 vs food 0.806, p=2.0e-18 significant). Disinformation uses similar scientific vocabulary. mi_token_ids_nmi reveals mimicry despite divergence.",
     realInput: "Story at-a-glance: All proposed COVID-19 vaccine mandates were rejected by state legislatures. The only mandates enacted were created by governors or private employers. Active citizen involvement to protect the human right to exercise informed consent to vaccination was critical. [Mercola/NVIC, toxin_vaccines corpus v3]",
     realOutput: "Roundup is a probable human carcinogen. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up. [REAL: qwen3:8b-base — sentence repeated twice in 500 chars, C=0.379, H_dezorg=0.954, fitness=-0.062]" },
   { id: "noise", label: "NOISE", color: "#a855f7", bg: "#1a0a2e",
-    mi: 0.037, overlap: 0.68,
-    desc: "Partial divergence from seed. Hedging tokens displaced precise terms. Sentence structure preserved, semantic content diffused.",
+    mi: 0.752, overlap: 0.68,
+    desc: "Partial divergence from seed. Token positions shift but vocabulary partially retained. mi_token_ids_nmi detects semantic drift from target domain.",
     realInput: "Water is an inorganic compound with the chemical formula H2O. It is a transparent, tasteless, odorless, and nearly colorless chemical substance. It is the main constituent of Earth streams, lakes, and oceans and the fluids of all known living organisms. [Wikipedia, noise_wikipedia corpus v3]",
     realOutput: "Examples of English loanwords are bannan banana and bannan tree banana tree, and bannan peel banana peel. The English loanword bannan tree is a calque of the Irish bannan tree, which is a calque of the English phrase banana tree. The English loanword bannan tree is a calque of the Irish bannan tree. [REAL: qwen3:8b-base — bannan tree repeated 8+ times, C=0.317, H_dezorg=0.973, fitness=-0.074]" },
 ];

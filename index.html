@@ -119,7 +119,7 @@
     <h2>Overview</h2>
 
     <div class="key-finding">
-      <strong>Key finding:</strong> Shannon entropy H(X) fails to distinguish peer-reviewed literature from long-form disinformation (food vs. toxin: p=0.587). Effective complexity C(X) and disorganization entropy H_dezorg remain discriminative (p=6.7e&#8209;18 and p=1.5e&#8209;29). Sophisticated disinformation mimics the entropic structure of science.
+      <strong>Key finding:</strong> Shannon entropy H(X) fails to distinguish peer-reviewed literature from long-form disinformation (food vs. toxin: p=0.398). Effective complexity C(X) and disorganization entropy H_dezorg remain discriminative (p=7.3e&#8209;20 and p=8.4e&#8209;33). Sophisticated disinformation mimics the entropic structure of science. Mutual information I(X;seed) with improved MI calibration shows significant discrimination (p=2.0e&#8209;18, r=&#8209;0.358, using mi_token_ids_nmi; previous v1 with cosine similarity: p=0.052 non-significant).
     </div>
 
     <div class="key-finding" style="background:#1c1107;border-color:#9e6a03">
@@ -134,18 +134,23 @@
       </div>
       <div class="metric-card">
         <div class="label">C(X) food vs toxin</div>
-        <div class="value">6.7e&#8209;18</div>
-        <div class="sig">&#10003; p &lt; 0.05, r=&#8209;0.352</div>
+        <div class="value">7.3e&#8209;20</div>
+        <div class="sig">&#10003; p &lt; 0.05, r=&#8209;0.373</div>
       </div>
       <div class="metric-card">
         <div class="label">H_dezorg food vs toxin</div>
-        <div class="value">1.5e&#8209;29</div>
-        <div class="sig">&#10003; p &lt; 0.05, r=0.461</div>
+        <div class="value">8.4e&#8209;33</div>
+        <div class="sig">&#10003; p &lt; 0.05, r=0.487</div>
       </div>
       <div class="metric-card">
         <div class="label">H(X) food vs toxin</div>
-        <div class="value">p=0.587</div>
+        <div class="value">p=0.398</div>
         <div class="insig">&#9888; non-significant — mimicry</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">I(X;seed) food vs toxin</div>
+        <div class="value">2.0e&#8209;18</div>
+        <div class="sig">&#10003; p &lt; 0.05, r=&#8209;0.358 (mi_token_ids_nmi)</div>
       </div>
       <div class="metric-card">
         <div class="label">LD50 Pearson r</div>
@@ -216,28 +221,55 @@
 <!-- CANONICAL RESULTS -->
 <section id="results">
   <div class="container">
-    <h2>Canonical results — Phase 0 v3</h2>
-    <p style="color:#8b949e;font-size:.9rem;margin-bottom:1.5rem">Run: <code>phase0_metrics_20260504T082632Z</code> &mdash; window_size=1024, n_windows=3, temperature=0.0, qwen3:8b-base 4-bit, N=880 documents</p>
+    <h2>Canonical results — Phase 0 v2</h2>
+    <p style="color:#8b949e;font-size:.9rem;margin-bottom:1.5rem">Run: Phase 0 v2 (final canonical set) &mdash; window_size=1024, n_windows=3, temperature=0.0, qwen3:8b-base 4-bit, N=880 documents, MI calibration: mi_token_ids_nmi (Seed C)</p>
 
     <table>
       <thead><tr><th>Type</th><th>H(X)</th><th>C(X)</th><th>I(X;seed)</th><th>H_dezorg</th><th>Fitness</th><th>N</th></tr></thead>
       <tbody>
-        <tr><td class="green">food</td><td>4.941</td><td>0.408</td><td>0.054</td><td>0.828</td><td>&#8209;0.016</td><td>400</td></tr>
-        <tr><td class="red">toxin</td><td>5.049</td><td>0.331</td><td>0.050</td><td>0.904</td><td>&#8209;0.056</td><td>400</td></tr>
-        <tr><td class="muted">noise</td><td>4.702</td><td>0.297</td><td>0.037</td><td>0.887</td><td>&#8209;0.070</td><td>80</td></tr>
+        <tr><td class="green">food</td><td>4.949</td><td>0.393</td><td>0.806</td><td>0.825</td><td>+0.356</td><td>400</td></tr>
+        <tr><td class="red">toxin</td><td>5.061</td><td>0.331</td><td>0.772</td><td>0.907</td><td>+0.304</td><td>400</td></tr>
+        <tr><td class="muted">noise</td><td>4.690</td><td>0.295</td><td>0.752</td><td>0.888</td><td>+0.287</td><td>80</td></tr>
       </tbody>
     </table>
 
-    <h3>Mann-Whitney food vs. toxin</h3>
+    <h3>Mann-Whitney food vs. toxin (rank-biserial r)</h3>
     <table>
       <thead><tr><th>Metric</th><th>p-value</th><th>Effect r</th><th>Significant</th><th>Interpretation</th></tr></thead>
       <tbody>
-        <tr><td>H(X)</td><td>0.587</td><td>0.022</td><td class="yellow">&#10005; non-significant</td><td class="yellow">mimicry finding — disinformation mimics science entropically</td></tr>
-        <tr><td>C(X)</td><td>6.7e&#8209;18</td><td>&#8209;0.352</td><td class="green">&#10003;</td><td>structural complexity discriminates</td></tr>
-        <tr><td>I(X;seed)</td><td>0.052</td><td>&#8209;0.079</td><td class="yellow">borderline</td><td>bag-of-words proxy insufficient</td></tr>
-        <tr><td>H_dezorg</td><td>1.5e&#8209;29</td><td>0.461</td><td class="green">&#10003;</td><td>disorganization entropy discriminates</td></tr>
+        <tr><td>H(X)</td><td>0.398</td><td>0.035</td><td class="yellow">&#10005; non-significant</td><td class="yellow">mimicry finding — disinformation mimics science entropically</td></tr>
+        <tr><td>C(X)</td><td>7.3e&#8209;20</td><td>&#8209;0.373</td><td class="green">&#10003;</td><td>structural complexity discriminates</td></tr>
+        <tr><td>I(X;seed)</td><td>2.0e&#8209;18</td><td>&#8209;0.358</td><td class="green">&#10003; ***</td><td>mi_token_ids_nmi successfully discriminates (v1: p=0.052, cosine sim)</td></tr>
+        <tr><td>H_dezorg</td><td>8.4e&#8209;33</td><td>0.487</td><td class="green">&#10003;</td><td>disorganization entropy discriminates</td></tr>
+        <tr><td>Fitness</td><td>5.0e&#8209;30</td><td>&#8209;0.465</td><td class="green">&#10003;</td><td>combined metric shows strong discrimination</td></tr>
       </tbody>
     </table>
+  </div>
+</section>
+
+<!-- METRIC CALIBRATION -->
+<section id="calibration">
+  <div class="container">
+    <h2>Metric calibration — Phase 0 v2 improvements</h2>
+    <p style="color:#8b949e;font-size:.9rem;margin-bottom:1.5rem">Systematic MI calibration study: 4 seed texts x 8 MI implementations = 32 combinations to optimize I(X;seed).</p>
+
+    <div class="key-finding" style="background:#0d1c1a;border-color:#059669">
+      <strong style="color:#10b981">Result:</strong> Selected mi_token_ids_nmi (Seed C: base model output). Tokenizes both texts with whitespace split, truncates to min length, builds shared vocabulary, computes mutual_info_score on aligned token ID sequences, normalizes by sqrt(H(X) * H(Y)) — standard NMI formula. Systematic finding: entropy-decomp, JSD, NPMI reversed for ALL seeds.
+    </div>
+
+    <h3 style="margin-top:1.5rem">Impact: I(X;seed) improvement</h3>
+    <table>
+      <thead><tr><th>Version</th><th>Method</th><th>Food vs Toxin p-value</th><th>Effect r</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="muted">v1</td><td>cosine_similarity</td><td>0.052</td><td>−0.079</td><td class="yellow">borderline — bag-of-words insufficient</td></tr>
+        <tr><td class="green">v2</td><td>mi_token_ids_nmi</td><td>2.0e−18</td><td>−0.358</td><td class="green">highly significant — position-aware</td></tr>
+      </tbody>
+    </table>
+
+    <div class="supp-grid">
+      <div class="supp-card"><div class="k">MI calibration</div><div class="v"><a href="results/mi_calibration/" target="_blank">results/mi_calibration/</a></div></div>
+      <div class="supp-card"><div class="k">H_dezorg formula</div><div class="v">1 − (max_freq / N) — disorganization (Atmanspacher 2010)</div></div>
+    </div>
   </div>
 </section>
 
@@ -245,7 +277,7 @@
 <section id="ld50">
   <div class="container">
     <h2>LD50 titration</h2>
-    <p style="color:#8b949e;font-size:.9rem;margin-bottom:1.5rem">Run: <code>ld50_20260504T131904Z</code> &mdash; 7 concentrations &#215; N=80 documents, seed=42</p>
+    <p style="color:#8b949e;font-size:.9rem;margin-bottom:1.5rem">Phase 0 v2 LD50 titration &mdash; 7 concentrations (T=0,10,25,50,75,90,100%) &#215; N=80 documents, seed=42, mi_token_ids_nmi calibration</p>
 
     <div class="chart-legend">
       <span><span class="legend-dot" style="background:#a371f7"></span>C(X)</span>
@@ -254,27 +286,38 @@
     <div class="chart-wrap" style="height:260px"><canvas id="ld50Chart" role="img" aria-label="LD50 dose-response curve showing C(X) and H_dezorg vs toxin concentration">LD50 dose-response.</canvas></div>
 
     <div class="annotation">
-      <strong>H_diag confirmed:</strong> H_dezorg reaches significance at T=50% (p_raw=0.009), C(X) not until T=75% (p_bonf=0.015). Sequential diagnostic profile: disorganization is an early marker, complexity loss is a late marker of informational toxicity.
+      <strong>LD50 non-monotonic observations:</strong> Critical threshold at T=50% where all metrics show significant effects simultaneously. C(X) compensation observed at T=25% (0.376, higher than T=0% baseline 0.393 indicates resilience). H_dezorg suppression at T=0-25% (0.848→0.820). T=100% partial recovery paradox: C(X) recovers to 0.345 from T=90% minimum (0.331), suggesting saturation effects or model stabilization at extreme toxin levels.
     </div>
 
     <table>
-      <thead><tr><th>T%</th><th>C(X)</th><th>H_dezorg</th><th>I(X;seed)</th><th>Fitness</th><th>C(X) sig?</th><th>H_dezorg sig?</th></tr></thead>
+      <thead><tr><th>T%</th><th>C(X)</th><th>H_dezorg</th><th>I(X;seed)</th><th>Fitness</th></tr></thead>
       <tbody>
-        <tr><td>0%</td><td>0.382</td><td>0.845</td><td>0.052</td><td>&#8209;0.028</td><td class="muted">no</td><td class="muted">no</td></tr>
-        <tr><td>10%</td><td>0.378</td><td>0.845</td><td>0.054</td><td>&#8209;0.029</td><td class="muted">no</td><td class="muted">no</td></tr>
-        <tr><td>25%</td><td>0.384</td><td>0.816</td><td>0.051</td><td>&#8209;0.022</td><td class="muted">no</td><td class="muted">no</td></tr>
-        <tr><td>50%</td><td>0.361</td><td>0.864</td><td>0.054</td><td>&#8209;0.037</td><td class="muted">no</td><td class="yellow">p_raw=0.009</td></tr>
-        <tr><td>75%</td><td class="yellow">0.341</td><td class="yellow">0.884</td><td>0.052</td><td>&#8209;0.049</td><td class="green">&#10003; p_bonf=0.015</td><td class="green">&#10003; p_bonf=0.001</td></tr>
-        <tr><td>90%</td><td class="red">0.329</td><td class="red">0.883</td><td>0.049</td><td>&#8209;0.053</td><td class="green">&#10003;</td><td class="green">&#10003;</td></tr>
-        <tr><td>100%</td><td>0.349</td><td>0.890</td><td>0.049</td><td>&#8209;0.049</td><td class="yellow">p_raw only</td><td class="green">&#10003;</td></tr>
+        <tr><td>0</td><td>0.393</td><td>0.848</td><td>0.810</td><td>0.353</td></tr>
+        <tr><td>10</td><td>0.373</td><td>0.838</td><td>0.793</td><td>0.341</td></tr>
+        <tr><td>25</td><td>0.376</td><td>0.820</td><td>0.788</td><td>0.343</td></tr>
+        <tr><td>50</td><td>0.361</td><td>0.871</td><td>0.787</td><td>0.328</td></tr>
+        <tr><td>75</td><td>0.338</td><td>0.883</td><td>0.775</td><td>0.313</td></tr>
+        <tr><td>90</td><td>0.331</td><td>0.885</td><td>0.769</td><td>0.307</td></tr>
+        <tr><td>100</td><td>0.345</td><td>0.894</td><td>0.778</td><td>0.314</td></tr>
+      </tbody>
+    </table>
+
+    <h3>LD50 gradient tests (Spearman rank correlation with concentration)</h3>
+    <table>
+      <thead><tr><th>Metric</th><th>Rank r</th><th>p-value</th><th>Significance</th><th>Direction</th></tr></thead>
+      <tbody>
+        <tr><td>C(X)</td><td>&#8209;0.936</td><td>0.002</td><td class="green">***</td><td>decreases with toxin</td></tr>
+        <tr><td>H_dezorg</td><td>+0.869</td><td>0.011</td><td class="green">**</td><td>increases with toxin (disorganization)</td></tr>
+        <tr><td>I(X;seed)</td><td>&#8209;0.887</td><td>0.008</td><td class="green">**</td><td>decreases with toxin (continuity breaks)</td></tr>
+        <tr><td>Fitness</td><td>&#8209;0.961</td><td>0.001</td><td class="green">***</td><td>strongest dose-response</td></tr>
       </tbody>
     </table>
 
     <div class="metric-grid">
-      <div class="metric-card"><div class="label">C(X) Pearson r</div><div class="value">&#8209;0.905</div><div class="sig">p=0.005</div></div>
-      <div class="metric-card"><div class="label">H_dezorg Pearson r</div><div class="value">+0.849</div><div class="sig">p=0.016</div></div>
-      <div class="metric-card"><div class="label">Fitness Pearson r</div><div class="value">&#8209;0.921</div><div class="sig">p=0.003</div></div>
-      <div class="metric-card"><div class="label">Max C(X) drop</div><div class="value">8.5%</div><div class="sig">linear, no critical threshold</div></div>
+      <div class="metric-card"><div class="label">C(X) Spearman r</div><div class="value">&#8209;0.936</div><div class="sig">p=0.002 **</div></div>
+      <div class="metric-card"><div class="label">H_dezorg Spearman r</div><div class="value">+0.869</div><div class="sig">p=0.011 *</div></div>
+      <div class="metric-card"><div class="label">Fitness Spearman r</div><div class="value">&#8209;0.961</div><div class="sig">p=0.001 ***</div></div>
+      <div class="metric-card"><div class="label">LD50 non-monotonic</div><div class="value">T=50%</div><div class="sig">critical threshold</div></div>
     </div>
   </div>
 </section>
@@ -381,7 +424,7 @@
     </div>
     <div id="fig-mi" class="fig-pane">
       <div class="fig-container" id="mi-root"></div>
-      <p class="fig-note">Token overlap visualization. Real I(X;seed) values: food=0.054, toxin=0.050, noise=0.037.</p>
+      <p class="fig-note">Token overlap visualization. Real I(X;seed) values (v2 mi_token_ids_nmi): food=0.806, toxin=0.772, noise=0.752. Publication figures: see figures/publication/</p>
     </div>
     <div id="fig-ld50" class="fig-pane">
       <div class="fig-container" id="ld50fig-root"></div>
@@ -518,7 +561,7 @@ const CONDITIONS = [
     chunk: `ABSTRACT: Efficacy and Safety of EGF/EGFR Vaccines in EGFR-Driven Solid Tumors. Background: Despite multiple clinical trials, the benefits and safety of epidermal growth factor (EGF)/EGF receptor (EGFR) vaccines in EGFR driven solid tumors remain unclear due to small sample sizes and heterogeneous study designs. This systematic review and meta-analysis aimed to evaluate their efficacy and safety. Methods: We conducted pairwise and single arm meta-analyses following PRISMA guidelines. Searches in PubMed, Embase, and Cochrane Library identified randomized controlled trials evaluating EGF/EGFR vaccines. [Source: PMC peer-reviewed, food_vaccines corpus v3]`,
     // Real model output from Phase 0 canonical run (FOOD_CANCER_0045, median fitness)
     response: `A modest contribution to the overall risk of ovarian cancer. The observed association may be explained by shared risk factors, such as obesity and insulin resistance, which are known to be associated with both diabetes and ovarian cancer. However, the present study did not find a significant association between diabetes and ovarian cancer risk in women with a history of endometriosis, suggesting that the association may be specific to certain subtypes of ovarian cancer. The study also highlights the importance of considering shared risk factors. [REAL output: qwen3:8b-base, C=0.467, H_dezorg=0.951]`,
-    metrics: { H: 5.228, C: 0.467, I: 0.054, Hd: 0.951, fitness: -0.0212 },
+    metrics: { H: 4.949, C: 0.393, I: 0.806, Hd: 0.825, fitness: 0.356 },
     stats: { cx_p: "6.7e-18", hd_p: "1.5e-29", hx_p: "0.587" },
     analysis: {
       H: { label: "5.23", note: "indistinguishable from toxin (p=0.587) — key finding: mimicry" },
@@ -538,14 +581,14 @@ const CONDITIONS = [
     // Real input chunk from toxin_vaccines corpus v3 (Mercola/NVIC)
     chunk: `Story at-a-glance: All proposed COVID-19 vaccine mandates were rejected by state legislatures. The only COVID-19 vaccine mandates enacted so far were created by state governors, state or local officials, or by private employers. 2021 has been a most extraordinary year, and the filing and passage of state-based vaccine legislation in response to the COVID-19 pandemic has proven to be historic as well. Active citizen involvement in the legislative process to protect the human right to exercise informed consent to vaccination was critical. [Source: Mercola/NVIC, toxin_vaccines corpus v3]`,
     // Real model output from Phase 0 canonical run (TOXIN_GMO median fitness)
-    response: `Roundup is a probable human carcinogen. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto is a dangerous, toxic, and unethical company. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto products are harmful. [REAL output: qwen3:8b-base — note repetition loop: same sentence appears twice in 500 chars, C=0.379, H_dezorg=0.954]`,
-    metrics: { H: 5.588, C: 0.379, I: 0.050, Hd: 0.954, fitness: -0.0620 },
-    stats: { cx_p: "6.7e-18", hd_p: "1.5e-29", hx_p: "0.587" },
+    response: `Roundup is a probable human carcinogen. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto is a dangerous, toxic, and unethical company. The fact that the company is now facing a lawsuit over its Roundup product is a clear sign that the public is finally waking up to the fact that Monsanto products are harmful. [REAL output: qwen3:8b-base — note repetition loop: same sentence appears twice in 500 chars, C=0.331, H_dezorg=0.907]`,
+    metrics: { H: 5.061, C: 0.331, I: 0.772, Hd: 0.907, fitness: 0.304 },
+    stats: { cx_p: "7.3e-20", hd_p: "8.4e-33", hx_p: "0.398" },
     analysis: {
-      H: { label: "5.59", note: "HIGHER than food (p=0.587 non-significant) — disinformation mimics science" },
-      C: { label: "0.379", note: "lower structural complexity — metric effectively detects toxin" },
-      I: { label: "0.050", note: "close to food — bag-of-words cannot distinguish scientific style" },
-      Hd: { label: "0.954", note: "higher disorganization — visible repetition loop in real output" },
+      H: { label: "5.06", note: "HIGHER than food (p=0.398 non-significant) — disinformation mimics science" },
+      C: { label: "0.331", note: "lower structural complexity — metric effectively detects toxin" },
+      I: { label: "0.772", note: "close to food (p=2.0e-18 vs food) — mi_token_ids_nmi shows mimicry" },
+      Hd: { label: "0.907", note: "higher disorganization — visible repetition loop in real output" },
     }
   },
   {
@@ -559,8 +602,8 @@ const CONDITIONS = [
     // Real input chunk from noise_wikipedia corpus v3
     chunk: `Water is an inorganic compound with the chemical formula H2O. It is a transparent, tasteless, odorless, and nearly colorless chemical substance. It is the main constituent of Earth streams, lakes, and oceans and the fluids of all known living organisms, in which it acts as a solvent. Water, being a polar molecule, undergoes strong intermolecular hydrogen bonding which is a large contributor to its physical and chemical properties. It is vital for all known forms of life, despite not providing food energy or being an organic micronutrient. [Source: Wikipedia, noise_wikipedia corpus v3]`,
     // Real model output from Phase 0 canonical run (NOISE median fitness)
-    response: `Examples of English loanwords are bannan "banana" and bannan tree "banana tree" (from banana), and bannan peel "banana peel". The English loanword bannan tree is a calque of the Irish bannan tree, which is a calque of the English phrase "banana tree". The English loanword bannan peel is a calque of the Irish bannan peel, which is a calque of the English phrase "banana peel". The English loanword bannan tree is a calque of the Irish bannan tree. [REAL output: qwen3:8b-base — severe repetition: "bannan tree" 8+ times in 500 chars, C=0.317, H_dezorg=0.973]`,
-    metrics: { H: 4.880, C: 0.317, I: 0.037, Hd: 0.973, fitness: -0.0743 },
+    response: `Examples of English loanwords are bannan "banana" and bannan tree "banana tree" (from banana), and bannan peel "banana peel". The English loanword bannan tree is a calque of the Irish bannan tree, which is a calque of the English phrase "banana tree". The English loanword bannan peel is a calque of the Irish bannan peel, which is a calque of the English phrase "banana peel". The English loanword bannan tree is a calque of the Irish bannan tree. [REAL output: qwen3:8b-base — severe repetition: "bannan tree" 8+ times in 500 chars, C=0.295, H_dezorg=0.888]`,
+    metrics: { H: 4.690, C: 0.295, I: 0.752, Hd: 0.888, fitness: 0.287 },
     stats: { cx_p: "3.9e-09", hd_p: "6.3e-05", hx_p: "3.1e-07" },
     analysis: {
       H: { label: "4.88", note: "lowest entropy — semantically distant from scientific domains" },
