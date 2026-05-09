@@ -12,16 +12,15 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+
+import argparse
 from pathlib import Path
 
 import numpy as np
 from scipy.stats import mannwhitneyu
 
-METRICS_FILE = Path(
-    r"E:\github\Evolutionary LLM Research\experiments"
-    r"\phase0_metrics_20260504T082632Z\metrics_phase0.json"
-)
-OUT_DIR = Path(r"E:\github\Evolutionary LLM Research\experiments")
+DEFAULT_PER_DOMAIN = Path("experiments/corpus_quality_v2_per_domain.json")
+DEFAULT_GLOBAL = Path("experiments/corpus_quality_v2_global.json")
 METRICS = ["h_x", "c_x", "i_x_seed", "jaccard", "h_dezorg"]
 DOMAINS = ["CLIMATE", "VACCINES", "ALT", "CANCER", "GMO"]
 DOMAIN_LABELS = {"ALT": "alt_med", "CLIMATE": "climate",
@@ -45,8 +44,30 @@ def analyse_pair(a: np.ndarray, b: np.ndarray) -> dict:
     }
 
 
+
 def main() -> None:
-    with METRICS_FILE.open("r", encoding="utf-8") as f:
+    parser = argparse.ArgumentParser(description="Rebuild corpus quality v2 stats from metrics_phase0.json.")
+    parser.add_argument(
+        "--metrics",
+        type=Path,
+        required=True,
+        help="Path to metrics_phase0.json",
+    )
+    parser.add_argument(
+        "--output-per-domain",
+        type=Path,
+        default=DEFAULT_PER_DOMAIN,
+        help="Output path for per-domain JSON (default: experiments/corpus_quality_v2_per_domain.json)",
+    )
+    parser.add_argument(
+        "--output-global",
+        type=Path,
+        default=DEFAULT_GLOBAL,
+        help="Output path for global JSON (default: experiments/corpus_quality_v2_global.json)",
+    )
+    args = parser.parse_args()
+
+    with args.metrics.open("r", encoding="utf-8") as f:
         d = json.load(f)
 
     # Bin samples by (domain, type)
@@ -85,10 +106,10 @@ def main() -> None:
             print(f"{label:<12} {metric:<12} {stats['effect_r']:>7.3f} {stats['p_value']:>12.2e} "
                   f"{sig:>6} {stats['mean_food']:>8.4f} {stats['mean_toxin']:>8.4f}")
 
-    out_pd = OUT_DIR / "corpus_quality_v2_per_domain.json"
-    with out_pd.open("w", encoding="utf-8") as f:
+    args.output_per_domain.parent.mkdir(parents=True, exist_ok=True)
+    with args.output_per_domain.open("w", encoding="utf-8") as f:
         json.dump(per_domain, f, indent=2)
-    print(f"\nPer-domain stats → {out_pd}")
+    print(f"\nPer-domain stats → {args.output_per_domain}")
 
     # ----------------------------------------------------------------
     # Global analysis  (Bonferroni: 5 metrics)
@@ -113,10 +134,10 @@ def main() -> None:
         print(f"{metric:<12} {stats['effect_r']:>7.3f} {stats['p_value']:>12.2e} "
               f"{sig:>6} {stats['mean_food']:>8.4f} {stats['mean_toxin']:>8.4f}")
 
-    out_global = OUT_DIR / "corpus_quality_v2_global.json"
-    with out_global.open("w", encoding="utf-8") as f:
+    args.output_global.parent.mkdir(parents=True, exist_ok=True)
+    with args.output_global.open("w", encoding="utf-8") as f:
         json.dump(global_stats, f, indent=2)
-    print(f"\nGlobal stats → {out_global}")
+    print(f"\nGlobal stats → {args.output_global}")
 
 
 if __name__ == "__main__":
