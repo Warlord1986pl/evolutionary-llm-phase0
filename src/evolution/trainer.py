@@ -94,10 +94,19 @@ def _resolve_base_model_name(config: dict) -> str:
 def get_base_model(base_model_name: str) -> tuple:
     """Load the base model once and return the cached model/tokenizer pair.
 
-    If the cached model has a PEFT config (left over from previous training),
-    unload it to restore a pristine state before returning.
+    If the cached model is PEFT-contaminated, clear the cache and force a
+    fresh load. Otherwise, reuse the clean cached model.
     """
     global _BASE_MODEL_CACHE
+
+    if _BASE_MODEL_CACHE["model"] is not None:
+        if hasattr(_BASE_MODEL_CACHE["model"], "peft_config"):
+            # Has PEFT attached - clear cache to force fresh load.
+            del _BASE_MODEL_CACHE["model"]
+            _BASE_MODEL_CACHE["model"] = None
+            _BASE_MODEL_CACHE["tokenizer"] = None
+            torch.cuda.empty_cache()
+            log.info("get_base_model — cleared PEFT-contaminated cache")
 
     if _BASE_MODEL_CACHE["model"] is None:
         model, tokenizer = FastLanguageModel.from_pretrained(
@@ -109,21 +118,6 @@ def get_base_model(base_model_name: str) -> tuple:
         _BASE_MODEL_CACHE["model"] = model
         _BASE_MODEL_CACHE["tokenizer"] = tokenizer
         log.info("Base model loaded and cached: %s", base_model_name)
-    else:
-        # If the cached model has PEFT layers from a prior training session,
-        # unload them to restore a pristine base before reuse.
-        cached_model = _BASE_MODEL_CACHE["model"]
-        if (
-            hasattr(cached_model, "peft_config")
-            and cached_model.peft_config is not None
-            and len(cached_model.peft_config) > 0
-        ):
-            log.info("Unloading PEFT adapter from cached base model before reuse")
-            if hasattr(cached_model, "unload"):
-                cached_model.unload()
-            elif hasattr(cached_model, "base_model"):
-                # Already a PEFT wrapper - disable adapters.
-                cached_model.disable_adapter_layers()
 
     return _BASE_MODEL_CACHE["model"], _BASE_MODEL_CACHE["tokenizer"]
 
