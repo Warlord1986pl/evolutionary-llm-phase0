@@ -208,11 +208,19 @@ def sample_biome_documents(
             continue
         pool = corpus[bucket]
         if len(pool) < n:
-            raise ValueError(
-                f"Corpus bucket '{bucket}' has only {len(pool)} documents "
-                f"but {n} were requested (generation={generation})"
+            # Fallback: if exact sampling fails, use sampling with replacement.
+            # This allows longer runs but documents may repeat.
+            log.warning(
+                "Corpus bucket '%s' has only %d documents, requested %d "
+                "(generation=%d). Using sampling with replacement.",
+                bucket,
+                len(pool),
+                n,
+                generation,
             )
-        indices = rng.choice(len(pool), size=n, replace=False)
+            indices = rng.choice(len(pool), size=n, replace=True)
+        else:
+            indices = rng.choice(len(pool), size=n, replace=False)
         sampled.extend(pool[i] for i in indices)
 
     # Shuffle to interleave types; model must never infer type from position.
