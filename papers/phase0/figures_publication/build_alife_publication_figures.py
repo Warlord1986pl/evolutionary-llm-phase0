@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 from typing import Any
@@ -27,34 +28,59 @@ def save_figure(fig: plt.Figure, out_base: Path) -> None:
     fig.savefig(out_base.with_suffix(".pdf"), bbox_inches="tight")
 
 
+def load_metrics_samples(metrics_file: Path) -> list[dict[str, Any]]:
+    """Load metrics samples from either JSONL or structured JSON.
+
+    Supported formats:
+    - .jsonl: one JSON object per line
+    - .json: object with key "results" containing a list of samples
+    """
+    if metrics_file.suffix.lower() == ".jsonl":
+        samples: list[dict[str, Any]] = []
+        with metrics_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                samples.append(json.loads(line))
+        return samples
+
+    if metrics_file.suffix.lower() == ".json":
+        data = load_json(metrics_file)
+        results = data.get("results")
+        if not isinstance(results, list):
+            raise ValueError(f"Expected 'results' list in JSON file: {metrics_file}")
+        return results
+
+    raise ValueError(f"Unsupported metrics file format: {metrics_file}")
+
+
 def _compute_fitness_food_vs_toxin_stats(metrics_file: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     """Compute food-vs-toxin fitness stats per domain and globally."""
     domains = ["climate", "vaccines", "alt_med", "cancer", "gmo"]
     food_by_domain: dict[str, list[float]] = {d: [] for d in domains}
     toxin_by_domain: dict[str, list[float]] = {d: [] for d in domains}
 
-    with metrics_file.open("r", encoding="utf-8") as f:
-        for line in f:
-            sample = json.loads(line)
-            fitness = sample.get("fitness")
-            sample_type = str(sample.get("type", "")).lower()
-            sample_id = str(sample.get("id", "")).upper()
+    for sample in load_metrics_samples(metrics_file):
+        fitness = sample.get("fitness")
+        sample_type = str(sample.get("type", "")).lower()
+        sample_id = str(sample.get("id", sample.get("sample_id", ""))).upper()
 
-            if fitness is None:
-                continue
+        if fitness is None:
+            continue
 
-            sample_domain = None
-            for domain in domains:
-                if f"_{domain.upper()}_" in sample_id:
-                    sample_domain = domain
-                    break
-            if sample_domain is None:
-                continue
+        sample_domain = None
+        for domain in domains:
+            if f"_{domain.upper()}_" in sample_id:
+                sample_domain = domain
+                break
+        if sample_domain is None:
+            continue
 
-            if sample_type == "food":
-                food_by_domain[sample_domain].append(float(fitness))
-            elif sample_type in ("toxin", "toxin"):
-                toxin_by_domain[sample_domain].append(float(fitness))
+        if sample_type == "food":
+            food_by_domain[sample_domain].append(float(fitness))
+        elif sample_type in ("toxin", "toxin"):
+            toxin_by_domain[sample_domain].append(float(fitness))
 
     per_domain_fitness: dict[str, Any] = {}
     all_food: list[float] = []
@@ -204,7 +230,7 @@ def build_figure_1_metric_discrimination(
 def build_figure_1_metric_discrimination_with_fitness(
     per_domain: dict[str, Any],
     global_stats: dict[str, Any],
-    repo_root: Path,
+    metrics_file: Path,
     out_dir: Path,
 ) -> None:
     """Build extended Figure 1 with an additional Fitness column."""
@@ -214,7 +240,6 @@ def build_figure_1_metric_discrimination_with_fitness(
     metrics = base_metrics + ["fitness"]
     metric_labels = ["H(X)", "C(X)", "I(X;seed)", "Jaccard", "H_dezorg", "Fitness"]
 
-    metrics_file = repo_root / "experiments" / "phase0_metrics_20260504T082632Z" / "metrics_progressive.jsonl"
     per_domain_fitness, global_fitness = _compute_fitness_food_vs_toxin_stats(metrics_file)
 
     bonf_alpha_pd = 0.05 / (len(metrics) * len(domains))
@@ -564,30 +589,26 @@ def build_figure_3_corpus_hierarchy(
     plt.close(fig)
 
 
-def build_figure_fitness_biomarker(fitness_stats: dict[str, Any], repo_root: Path, out_dir: Path) -> None:
+def build_figure_fitness_biomarker(fitness_stats: dict[str, Any], metrics_file: Path, out_dir: Path) -> None:
     """Build Figure 4: fitness function as composite biomarker (simplified bar plot)."""
     # Load raw fitness data
-    metrics_file = repo_root / "experiments" / "phase0_metrics_20260504T082632Z" / "metrics_progressive.jsonl"
-    
     food = []
     toxin = []
     noise = []
 
-    with open(metrics_file) as f:
-        for line in f:
-            sample = json.loads(line)
-            fitness = sample.get("fitness", np.nan)
-            
-            if np.isnan(fitness):
-                continue
-            
-            sample_type = sample.get("type", "").lower()
-            if sample_type == "food":
-                food.append(fitness)
-            elif sample_type in ("toxin", "toxin"):
-                toxin.append(fitness)
-            elif sample_type == "noise":
-                noise.append(fitness)
+    for sample in load_metrics_samples(metrics_file):
+        fitness = sample.get("fitness", np.nan)
+
+        if np.isnan(fitness):
+            continue
+
+        sample_type = sample.get("type", "").lower()
+        if sample_type == "food":
+            food.append(fitness)
+        elif sample_type in ("toxin", "toxin"):
+            toxin.append(fitness)
+        elif sample_type == "noise":
+            noise.append(fitness)
 
     food_vals = np.array(food, dtype=float)
     toxin_vals = np.array(toxin, dtype=float)
@@ -720,9 +741,30 @@ def build_figure_3_corpus_hierarchy_old(
 
 def main() -> None:
     """Generate ALife publication figures from project experiment outputs."""
+    parser = argparse.ArgumentParser(description="Generate ALife Phase 0 publication figures.")
+    parser.add_argument(
+        "--metrics",
+        type=Path,
+        required=True,
+        help="Path to metrics_phase0.json (or metrics_progressive.jsonl)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("papers/phase0/figures_publication/generated"),
+        help="Output directory for generated figures",
+    )
+    args = parser.parse_args()
+
     repo_root = Path(__file__).resolve().parents[3]
-    out_dir = repo_root / "papers" / "phase0" / "figures_publication" / "generated"
+    out_dir = args.output_dir
+    if not out_dir.is_absolute():
+        out_dir = repo_root / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    metrics_file = args.metrics
+    if not metrics_file.is_absolute():
+        metrics_file = repo_root / metrics_file
 
     per_domain_path = repo_root / "experiments" / "corpus_quality_v2_per_domain.json"
     global_path = repo_root / "experiments" / "corpus_quality_v2_global.json"
@@ -739,10 +781,10 @@ def main() -> None:
     diagnostic_data = load_json(diag_path)
 
     build_figure_1_metric_discrimination(per_domain, global_stats, out_dir)
-    build_figure_1_metric_discrimination_with_fitness(per_domain, global_stats, repo_root, out_dir)
+    build_figure_1_metric_discrimination_with_fitness(per_domain, global_stats, metrics_file, out_dir)
     build_figure_1b_three_class_discrimination(three_class_stats, out_dir)
     build_figure_3_corpus_hierarchy_old(three_class_stats, out_dir)
-    build_figure_fitness_biomarker(fitness_stats, repo_root, out_dir)
+    build_figure_fitness_biomarker(fitness_stats, metrics_file, out_dir)
     build_figure_2_ld50_biomarker(ld50_data, diagnostic_data, out_dir)
 
     print("Generated figures:")
