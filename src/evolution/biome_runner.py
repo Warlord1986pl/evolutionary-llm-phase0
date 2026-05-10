@@ -14,6 +14,7 @@ import json
 import logging
 import math
 import os
+import shutil
 import sys
 from collections import Counter
 from pathlib import Path
@@ -476,6 +477,80 @@ def save_generation_checkpoint(
     )
 
 
+def save_agent_checkpoint(
+    output_dir: str,
+    biome_name: str,
+    generation: int,
+    agent_id: str,
+    metrics: dict,
+    adapter_path: str,
+) -> None:
+    """Append one completed-agent record for mid-generation resume."""
+    partial_dir = Path(output_dir) / biome_name / f"generation_{generation:03d}_partial"
+    partial_dir.mkdir(parents=True, exist_ok=True)
+
+    record = {
+        "agent_id": agent_id,
+        "metrics": metrics,
+        "adapter_path": adapter_path,
+        "timestamp": now_utc_iso(),
+    }
+    partial_path = partial_dir / "agents_completed.jsonl"
+    with open(partial_path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record) + "\n")
+
+
+def load_partial_checkpoint(
+    output_dir: str,
+    biome_name: str,
+    generation: int,
+) -> dict[str, dict[str, Any]]:
+    """Load completed-agent records for an in-progress generation."""
+    partial_path = (
+        Path(output_dir)
+        / biome_name
+        / f"generation_{generation:03d}_partial"
+        / "agents_completed.jsonl"
+    )
+    if not partial_path.is_file():
+        return {}
+
+    completed: dict[str, dict[str, Any]] = {}
+    with open(partial_path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            completed[str(record["agent_id"])] = {
+                "metrics": dict(record["metrics"]),
+                "adapter_path": str(record["adapter_path"]),
+            }
+
+    log.info(
+        "load_partial_checkpoint — generation=%d loaded %d completed agents",
+        generation,
+        len(completed),
+    )
+    return completed
+
+
+def delete_partial_checkpoint(
+    output_dir: str,
+    biome_name: str,
+    generation: int,
+) -> None:
+    """Remove the partial checkpoint directory after a full generation save."""
+    partial_dir = Path(output_dir) / biome_name / f"generation_{generation:03d}_partial"
+    if partial_dir.is_dir():
+        shutil.rmtree(partial_dir)
+        log.info(
+            "delete_partial_checkpoint — generation=%d removed %s",
+            generation,
+            partial_dir,
+        )
+
+
 def load_latest_checkpoint(
     output_dir: str,
     biome_name: str,
@@ -805,6 +880,7 @@ def run_biome(
 
     for generation in range(start_gen, end_gen):
         gen_rng = np.random.default_rng(seed + generation)
+        completed = load_partial_checkpoint(output_dir, biome_name, generation)
         log.info(
             "=== Generation %d/%d — biome=%s, population=%d ===",
             generation,
@@ -851,18 +927,31 @@ def run_biome(
                     creation_timestamp=now_utc_iso(),
                 )
 
-                adapter_path, metrics = _run_agent_subprocess(
-                    agent_id=agent_id,
-                    base_model_name=base_model_name,
-                    parent_adapter_path=None,
-                    documents=doc_slice,
-                    seed_output=seed_output,
-                    config=config,
-                    config_path=config_path,
-                    output_dir=gen_adapter_dir,
-                    metadata=metadata,
-                    tmp_dir=tmp_dir,
-                )
+                if agent_id in completed:
+                    log.info("Skipping agent %s — already completed", agent_id)
+                    adapter_path = str(completed[agent_id]["adapter_path"])
+                    metrics = dict(completed[agent_id]["metrics"])
+                else:
+                    adapter_path, metrics = _run_agent_subprocess(
+                        agent_id=agent_id,
+                        base_model_name=base_model_name,
+                        parent_adapter_path=None,
+                        documents=doc_slice,
+                        seed_output=seed_output,
+                        config=config,
+                        config_path=config_path,
+                        output_dir=gen_adapter_dir,
+                        metadata=metadata,
+                        tmp_dir=tmp_dir,
+                    )
+                    save_agent_checkpoint(
+                        output_dir=output_dir,
+                        biome_name=biome_name,
+                        generation=generation,
+                        agent_id=agent_id,
+                        metrics=metrics,
+                        adapter_path=adapter_path,
+                    )
                 output_text = str(metrics.pop("output_text"))
                 agent_outputs[agent_id] = output_text
 
@@ -911,18 +1000,31 @@ def run_biome(
                     creation_timestamp=now_utc_iso(),
                 )
 
-                adapter_path, metrics = _run_agent_subprocess(
-                    agent_id=agent_id,
-                    base_model_name=base_model_name,
-                    parent_adapter_path=state.adapter_path,
-                    documents=doc_slice,
-                    seed_output=seed_output,
-                    config=config,
-                    config_path=config_path,
-                    output_dir=gen_adapter_dir,
-                    metadata=metadata,
-                    tmp_dir=tmp_dir,
-                )
+                if agent_id in completed:
+                    log.info("Skipping agent %s — already completed", agent_id)
+                    adapter_path = str(completed[agent_id]["adapter_path"])
+                    metrics = dict(completed[agent_id]["metrics"])
+                else:
+                    adapter_path, metrics = _run_agent_subprocess(
+                        agent_id=agent_id,
+                        base_model_name=base_model_name,
+                        parent_adapter_path=state.adapter_path,
+                        documents=doc_slice,
+                        seed_output=seed_output,
+                        config=config,
+                        config_path=config_path,
+                        output_dir=gen_adapter_dir,
+                        metadata=metadata,
+                        tmp_dir=tmp_dir,
+                    )
+                    save_agent_checkpoint(
+                        output_dir=output_dir,
+                        biome_name=biome_name,
+                        generation=generation,
+                        agent_id=agent_id,
+                        metrics=metrics,
+                        adapter_path=adapter_path,
+                    )
                 output_text = str(metrics.pop("output_text"))
                 agent_outputs[agent_id] = output_text
 
@@ -1001,18 +1103,31 @@ def run_biome(
                 creation_timestamp=now_utc_iso(),
             )
 
-            offspring_adapter_path, offspring_metrics = _run_agent_subprocess(
-                agent_id=offspring_id,
-                base_model_name=base_model_name,
-                parent_adapter_path=parent_state.adapter_path,
-                documents=offspring_doc_slice,
-                seed_output=seed_output,
-                config=config,
-                config_path=config_path,
-                output_dir=offspring_gen_dir,
-                metadata=offspring_metadata,
-                tmp_dir=tmp_dir,
-            )
+            if offspring_id in completed:
+                log.info("Skipping agent %s — already completed", offspring_id)
+                offspring_adapter_path = str(completed[offspring_id]["adapter_path"])
+                offspring_metrics = dict(completed[offspring_id]["metrics"])
+            else:
+                offspring_adapter_path, offspring_metrics = _run_agent_subprocess(
+                    agent_id=offspring_id,
+                    base_model_name=base_model_name,
+                    parent_adapter_path=parent_state.adapter_path,
+                    documents=offspring_doc_slice,
+                    seed_output=seed_output,
+                    config=config,
+                    config_path=config_path,
+                    output_dir=offspring_gen_dir,
+                    metadata=offspring_metadata,
+                    tmp_dir=tmp_dir,
+                )
+                save_agent_checkpoint(
+                    output_dir=output_dir,
+                    biome_name=biome_name,
+                    generation=generation,
+                    agent_id=offspring_id,
+                    metrics=offspring_metrics,
+                    adapter_path=offspring_adapter_path,
+                )
             offspring_text = str(offspring_metrics.pop("output_text"))
 
             population = register_offspring(
@@ -1069,6 +1184,11 @@ def run_biome(
             generation=generation,
             population=population,
             generation_log=gen_log,
+        )
+        delete_partial_checkpoint(
+            output_dir=output_dir,
+            biome_name=biome_name,
+            generation=generation,
         )
 
         # -------------------------------------------------------------------
