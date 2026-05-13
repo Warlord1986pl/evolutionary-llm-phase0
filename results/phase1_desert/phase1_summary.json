@@ -1,0 +1,46 @@
+{
+  "biome": "savanna",
+  "n_generations": 35,
+  "fitness_gen0": 0.4181,
+  "fitness_final": 0.4553,
+  "fitness_delta": 0.0372,
+  "plateau_fitness": 0.456,
+  "plateau_generation": 26,
+  "converged_generation": 3,
+  "total_deaths": 0,
+  "total_births": 350,
+  "cusum_changepoints": [],
+  "mean_jsd_gen0": 0.2885,
+  "mean_jsd_final": 0.2732,
+  "phase0_baselines": {
+    "food_fitness": 0.356,
+    "toxin_fitness": 0.304,
+    "noise_fitness": 0.287,
+    "food_hx": 4.949,
+    "food_cx": 0.393
+  },
+  "delta_fitness_vs_phase0_food": 0.0993,
+  "metric_trajectories": {
+    "h_x": {
+      "gen0_mean": 6.7439,
+      "genN_mean": 6.7548,
+      "delta": 0.0109,
+      "delta_vs_phase0_baseline": 1.795
+    },
+    "c_x": {
+      "gen0_mean": 0.4969,
+      "genN_mean": 0.5438,
+      "delta": 0.047
+    },
+    "i_x_seed": {
+      "gen0_mean": 0.9204,
+      "genN_mean": 0.9253,
+      "delta": 0.0049
+    },
+    "h_dezorg": {
+      "gen0_mean": 0.9558,
+      "genN_mean": 0.8526,
+      "delta": -0.1032
+    }
+  }
+}
