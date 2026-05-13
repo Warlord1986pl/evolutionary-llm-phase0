@@ -406,6 +406,210 @@ def build_generation_log(
 
 
 # ---------------------------------------------------------------------------
+# Phylogeny tracking
+# ---------------------------------------------------------------------------
+
+
+def append_phylogeny_log(
+    output_dir: str,
+    biome_name: str,
+    generation: int,
+    generation_agents: dict[str, dict],
+    dying_ids: list[str],
+) -> None:
+    """Append per-agent phylogeny records for one generation to phylogeny.jsonl.
+
+    One line is written per agent, recording its lineage and whether it
+    survived to the end of the generation.  The file is opened in append mode
+    so records accumulate across generations.
+
+    Parameters
+    ----------
+    output_dir : str
+        Root output directory for the run.
+    biome_name : str
+        Biome label.
+    generation : int
+        Generation index.
+    generation_agents : dict[str, dict]
+        Mapping of ``agent_id -> {"parent_id": str | None, "fitness": float}``
+        for every agent that participated in this generation (including those
+        that died).
+    dying_ids : list[str]
+        agent_ids that died this generation (``alive`` is set to ``False``).
+    """
+    phylo_dir = Path(output_dir) / biome_name
+    phylo_dir.mkdir(parents=True, exist_ok=True)
+    phylo_path = phylo_dir / "phylogeny.jsonl"
+
+    dying_set = set(dying_ids)
+    with open(phylo_path, "a", encoding="utf-8") as fh:
+        for agent_id, data in generation_agents.items():
+            record = {
+                "generation": generation,
+                "agent_id": agent_id,
+                "parent_id": data.get("parent_id"),
+                "fitness": data.get("fitness"),
+                "alive": agent_id not in dying_set,
+            }
+            fh.write(json.dumps(record) + "\n")
+
+    log.info(
+        "append_phylogeny_log — generation=%d, %d records written to %s",
+        generation,
+        len(generation_agents),
+        phylo_path,
+    )
+
+
+def update_phylogeny_graph(
+    output_dir: str,
+    biome_name: str,
+    generation: int,
+    generation_agents: dict[str, dict],
+) -> None:
+    """Update the cumulative phylogeny graph with new nodes and edges.
+
+    Reads the existing ``phylogeny_graph.json`` (if any), appends new nodes
+    and edges for agents in this generation, then writes back atomically.
+    Existing nodes and edges are never removed or modified.
+
+    A warning is logged for any agent whose parent is not found among the
+    graph's existing nodes (orphan agent).
+
+    Parameters
+    ----------
+    output_dir : str
+        Root output directory for the run.
+    biome_name : str
+        Biome label.
+    generation : int
+        Generation index.
+    generation_agents : dict[str, dict]
+        Mapping of ``agent_id -> {"parent_id": str | None, "fitness": float}``
+        for every agent that participated in this generation.
+    """
+    phylo_dir = Path(output_dir) / biome_name
+    phylo_dir.mkdir(parents=True, exist_ok=True)
+    graph_path = phylo_dir / "phylogeny_graph.json"
+
+    if graph_path.is_file():
+        with open(graph_path, encoding="utf-8") as fh:
+            graph: dict = json.load(fh)
+    else:
+        graph = {"nodes": [], "edges": []}
+
+    existing_node_ids: set[str] = {n["id"] for n in graph["nodes"]}
+    existing_edge_keys: set[tuple[str, str]] = {
+        (e["parent"], e["child"]) for e in graph["edges"]
+    }
+
+    for agent_id, data in generation_agents.items():
+        if agent_id not in existing_node_ids:
+            graph["nodes"].append(
+                {
+                    "id": agent_id,
+                    "generation": generation,
+                    "fitness": data.get("fitness"),
+                }
+            )
+            existing_node_ids.add(agent_id)
+
+        parent_id = data.get("parent_id")
+        if parent_id is not None:
+            if parent_id not in existing_node_ids:
+                log.warning(
+                    "update_phylogeny_graph — orphan agent %s: "
+                    "parent %s not found in graph nodes (generation=%d)",
+                    agent_id,
+                    parent_id,
+                    generation,
+                )
+            edge_key = (parent_id, agent_id)
+            if edge_key not in existing_edge_keys:
+                graph["edges"].append(
+                    {
+                        "parent": parent_id,
+                        "child": agent_id,
+                        "generation": generation,
+                    }
+                )
+                existing_edge_keys.add(edge_key)
+
+    graph_tmp = str(graph_path) + ".tmp"
+    with open(graph_tmp, "w", encoding="utf-8") as fh:
+        json.dump(graph, fh, indent=2)
+    os.replace(graph_tmp, str(graph_path))
+
+    log.info(
+        "update_phylogeny_graph — generation=%d, total nodes=%d, total edges=%d",
+        generation,
+        len(graph["nodes"]),
+        len(graph["edges"]),
+    )
+
+
+def build_lineage_tree(phylogeny_graph_path: str) -> dict[str, list[str]]:
+    """Return full ancestor chains for every agent in the phylogeny graph.
+
+    Traverses the directed parent→child edges stored in
+    ``phylogeny_graph.json`` and builds a mapping from each agent to its
+    complete ancestor chain ordered from immediate parent to root.
+
+    Parameters
+    ----------
+    phylogeny_graph_path : str
+        Path to ``phylogeny_graph.json``.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping of ``agent_id -> [immediate_parent, grandparent, ..., root]``.
+        Root agents (no recorded parent) map to an empty list.
+
+    Raises
+    ------
+    FileNotFoundError
+        If *phylogeny_graph_path* does not exist.
+    """
+    graph_path = Path(phylogeny_graph_path)
+    if not graph_path.is_file():
+        raise FileNotFoundError(
+            f"Phylogeny graph not found: {phylogeny_graph_path!r}"
+        )
+
+    with open(graph_path, encoding="utf-8") as fh:
+        graph: dict = json.load(fh)
+
+    # child -> parent lookup
+    parent_map: dict[str, str] = {
+        e["child"]: e["parent"] for e in graph.get("edges", [])
+    }
+    node_ids: set[str] = {n["id"] for n in graph.get("nodes", [])}
+
+    lineage_cache: dict[str, list[str]] = {}
+
+    def _ancestors(agent_id: str, visited: set[str]) -> list[str]:
+        if agent_id in lineage_cache:
+            return lineage_cache[agent_id]
+        if agent_id in visited:
+            log.warning(
+                "build_lineage_tree — cycle detected at agent %s; truncating chain",
+                agent_id,
+            )
+            return []
+        parent = parent_map.get(agent_id)
+        if parent is None:
+            lineage_cache[agent_id] = []
+            return []
+        chain = [parent] + _ancestors(parent, visited | {agent_id})
+        lineage_cache[agent_id] = chain
+        return chain
+
+    return {nid: _ancestors(nid, set()) for nid in node_ids}
+
+
+# ---------------------------------------------------------------------------
 # Checkpoint management
 # ---------------------------------------------------------------------------
 
@@ -1059,6 +1263,16 @@ def run_biome(
         m_jsd = mean_jsd(jsd_matrix)
         log.info("gen=%d mean_JSD=%.4f", generation, m_jsd)
 
+        # Capture all agent data before deaths so dying agents are still
+        # included in phylogeny records with their measured fitness.
+        _generation_agents: dict[str, dict] = {
+            aid: {
+                "parent_id": s.parent_id,
+                "fitness": float(s.metrics.get("fitness", float("nan"))),
+            }
+            for aid, s in population.items()
+        }
+
         # -------------------------------------------------------------------
         # Step 5: Deaths
         # -------------------------------------------------------------------
@@ -1139,6 +1353,14 @@ def run_biome(
                 generation=generation,
             )
             births.append(offspring_id)
+            # Record offspring in phylogeny snapshot (born after the pre-death
+            # capture, so not yet present in _generation_agents).
+            _generation_agents[offspring_id] = {
+                "parent_id": population[offspring_id].parent_id,
+                "fitness": float(
+                    population[offspring_id].metrics.get("fitness", float("nan"))
+                ),
+            }
             log.info(
                 "gen=%d offspring=%s parent=%s fitness=%.4f",
                 generation,
@@ -1189,6 +1411,23 @@ def run_biome(
             output_dir=output_dir,
             biome_name=biome_name,
             generation=generation,
+        )
+
+        # -------------------------------------------------------------------
+        # Phylogeny tracking — append per-agent records and update graph
+        # -------------------------------------------------------------------
+        append_phylogeny_log(
+            output_dir=output_dir,
+            biome_name=biome_name,
+            generation=generation,
+            generation_agents=_generation_agents,
+            dying_ids=dying_ids,
+        )
+        update_phylogeny_graph(
+            output_dir=output_dir,
+            biome_name=biome_name,
+            generation=generation,
+            generation_agents=_generation_agents,
         )
 
         # -------------------------------------------------------------------

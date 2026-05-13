@@ -155,3 +155,98 @@
 **Docelowe parametry chunkingu dla korpusu v3:** window_size=1024, n_windows=3. Pokrywa 90% toxina przy pełnym profilu, kontekst generacji 2x lepszy.
 
 **toxin_climate wymaga nowego źródła.** CARDS/PlateClimatology to datasety twierdzeń, nie artykułów. WUWT działa przez Selenium. Mercola nie pisze o klimacie (3 artykuły z 120 prób).
+
+---
+
+## Sesja 2026-05-13 — Phase 1 zamknięta, Phase 1b design frozen
+
+**Status eksperymentów**
+
+| Eksperyment | Status | Uwagi |
+|---|---|---|
+| Phase 1 Savanna | COMPLETE | 35 gen, stara mechanika, deaths=0 |
+| Phase 1 Desert | COMPLETE | 35 gen, stara mechanika, deaths>0 |
+| Phase 1 Plain | COMPLETE | 35 gen, stara mechanika, deaths=0 |
+| Phase 1b Pilot (Desert, 12 gen) | COMPLETE — GO | nowa mechanika, deaths every gen |
+| Phase 1b pełny rerun | PENDING | 3 biomy × 3 seeds × 35 gen |
+
+**Dlaczego Phase 1 jest pilotem, nie finalnym eksperymentem**
+
+Phase 1 ujawnił dwie patologie mechaniki populacyjnej:
+
+- deaths=0 w Savanna i Plains przez wszystkie 35 generacji — brak selekcji gradualnej.
+- Przyczyna: stara `P_death = max(1 - exp(f/β), 0)` daje praktycznie 0 dla dodatnich fitness.
+- Różne `K_max` per biom (Desert=10, Plains=25, Savanna=30) i różny `N0/K_max` ratio konfundują porównania między biomami — struktura populacyjna różna, nie tylko środowisko.
+
+Wyniki Phase 1 są użyteczne jako obserwacja kierunkowa i uzasadnienie rekalibracji.
+Nie są finalnym dowodem na H0.
+
+**Wyniki Phase 1 (kierunkowe)**
+
+- Fitness plateau nierozróżnialne między biomami (~0.455-0.459).
+- Efekt środowiska widoczny w:
+  - `I(X;seed)`: Desert(+0.005) < Plains(+0.012) < Savanna(+0.022)
+  - JSD: sawanna homogenizuje (-38%), pustynia utrzymuje różnorodność (-5%)
+  - Kształt trajektorii: sawanna monotoniczna, pustynia oscylacyjna z wczesną stagnacją
+  - `H_dezorg` redukcja (~-0.10) jest właściwością fine-tuningu, nie środowiska
+
+**Rekalibracja mechaniki populacyjnej**
+
+Grid 4860 kombinacji na realnych rozkładach fitness Phase 1.
+Wybrane parametry (rank 2 z variance populacji jako kryterium):
+
+- `alpha_r = 1.0`, `alpha_d = 1.5`
+- `p_r_min = 0.05`, `p_r_max = 0.45`
+- `p_d_min = 0.07`, `p_d_max = 0.45`
+- `sigma_min = 0.01`
+
+Nowa mechanika z-score + bounded sigmoid:
+
+```text
+z_i = (f_i - μ_f) / max(σ_f, 0.01)
+P_rep_i   = 0.05 + 0.40 * sigmoid( 1.0 * z_i)
+P_death_i = 0.07 + 0.38 * sigmoid(-1.5 * z_i)
+```
+
+Uzasadnienie: selekcja względna (nie bezwzględna), `p_d_min=0.07` gwarantuje
+niezerową śmiertelność zawsze, eliminuje saturację `P_rep` do 1.0.
+
+**Phase 1b FROZEN parameters**
+
+- `N0: 12` — jednolite dla wszystkich biomów
+- `K_max: 30` — jednolite dla wszystkich biomów
+- `replications: 3` per biom (seeds: 42, 123, 456)
+- `generations: 35`
+- `docs_per_agent: 30`
+- `logging: generation_log + population_json + phylogeny_jsonl + phylogeny_graph`
+
+**Phase 1b Pilot — kluczowe obserwacje**
+
+Desert, 12 gen, `N0=12`, `K_max=30`:
+
+- deaths > 0 w każdym pokoleniu (12/12) — mechanika działa
+- Endogeniczne equilibrium: ~13 agentów (poniżej `K_max=30`)
+- Gen 6: deaths=7, purifying selection eliminuje dominującą linię, JSD rośnie
+- `std_fitness` oscyluje (nie kolapsuje permanentnie) — zdrowa dynamika
+
+Kluczowa obserwacja z drzewa genealogicznego:
+
+- Founder z najwyższym fitness gen0 (f=0.442) wymiera do gen 3
+- Founder ze średnim fitness (f=0.419) dominuje przez wszystkie 12 gen
+- Frequency-dependent selection emergentny — nie zaprojektowany, wynika z mechaniki
+- Długie linie nadmiernie wyspecjalizowane → eliminowane przez toksyczne dokumenty spoza ich rozkładu treningowego (over-specialization penalty)
+
+**Następne eksperymenty (po Phase 1b)**
+
+- Cross-biome transfer: desert survivors gen35 → populacja startowa w sawannie
+- H0: pre-adaptacja w pustyni nie przyspiesza adaptacji w sawannie
+- Mixed inoculation: survivors ze wszystkich 3 biomów (4 per biom) → nowe środowisko
+- Śledź które linie dominują genealogicznie
+- Phase 2: archetypes (Id/Ego/Superego LoRA adaptery)
+- Wymaga wyników Phase 1b jako baseline
+
+**Pytanie otwarte**
+
+Czy desert survivors są generalistami (szeroki LoRA, odporna na zmienność próbkowania)
+czy po prostu słabo wyspecjalizowanymi agentami (niski fitness absolutny)?
+Test: porównaj fitness desert survivors vs savanna fresh start w tym samym środowisku.

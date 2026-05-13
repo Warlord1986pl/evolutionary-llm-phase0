@@ -258,6 +258,111 @@ python3 -m src.evolution.cli run \
   --corpus-manifest data/v2/corpus_manifest_v3.json
 ```
 
+---
+
+## 2026-05-13 — Phase 1 closed, Phase 1b design frozen
+
+### Context
+
+Phase 1 completed across all biomes and exposed two population-mechanics pathologies:
+`deaths=0` in Savanna and Plains under the old death function, and cross-biome
+confounding caused by different `K_max` and `N0/K_max` ratios. A pilot rerun in Desert
+with the new bounded-sigmoid mechanics confirmed that the revised selection/death
+scheme produces deaths in every generation and a stable endogenous population equilibrium.
+
+### Experiment status
+
+| Experiment | Status | Notes |
+|---|---|---|
+| Phase 1 Savanna | COMPLETE | 35 generations, old mechanics, deaths=0 |
+| Phase 1 Desert | COMPLETE | 35 generations, old mechanics, deaths>0 |
+| Phase 1 Plain | COMPLETE | 35 generations, old mechanics, deaths=0 |
+| Phase 1b Pilot (Desert, 12 gen) | COMPLETE — GO | new mechanics, deaths every generation |
+| Phase 1b full rerun | PENDING | 3 biomes × 3 seeds × 35 generations |
+
+### Why Phase 1 is a pilot, not the final experiment
+
+Phase 1 exposed two mechanical issues in the population dynamics:
+
+- `deaths=0` in Savanna and Plains for all 35 generations, which prevented gradual selection.
+- The old `P_death = max(1 - exp(f/β), 0)` effectively collapses to zero for positive fitness values.
+- Biome-specific `K_max` values (`Desert=10`, `Plains=25`, `Savanna=30`) and different `N0/K_max` ratios confound biome comparisons because population structure changes along with environment.
+
+The Phase 1 results are still useful as directional evidence and as the rationale for
+recalibration, but they are not the final proof for H0.
+
+### Phase 1 directional findings
+
+- Fitness plateaus were indistinguishable across biomes at approximately 0.455-0.459.
+- Environmental effects remained visible in `I(X;seed)`, JSD, trajectory shape, and `H_dezorg` behavior.
+- Savanna homogenized diversity more strongly, while Desert preserved diversity but showed early stagnation.
+- `H_dezorg` reduction of about -0.10 appears to be a fine-tuning property rather than an environmental effect.
+
+### Population-mechanics recalibration
+
+A grid search over 4860 combinations on the actual Phase 1 fitness distributions selected the new bounded-sigmoid mechanics using variance of the population as the criterion.
+
+Selected parameters:
+
+| Parameter | Value |
+|---|---|
+| `alpha_r` | 1.0 |
+| `alpha_d` | 1.5 |
+| `p_r_min` | 0.05 |
+| `p_r_max` | 0.45 |
+| `p_d_min` | 0.07 |
+| `p_d_max` | 0.45 |
+| `sigma_min` | 0.01 |
+
+New z-score + bounded sigmoid mechanics:
+
+```text
+z_i = (f_i - μ_f) / max(σ_f, 0.01)
+P_rep_i   = 0.05 + 0.40 * sigmoid(1.0 * z_i)
+P_death_i = 0.07 + 0.38 * sigmoid(-1.5 * z_i)
+```
+
+This keeps selection relative rather than absolute, guarantees non-zero mortality via `p_d_min=0.07`, and prevents reproduction probability from saturating at 1.0.
+
+### Phase 1b frozen parameters
+
+| Parameter | Value |
+|---|---|
+| `N0` | 12, identical across biomes |
+| `K_max` | 30, identical across biomes |
+| `replications` | 3 per biome (seeds 42, 123, 456) |
+| `generations` | 35 |
+| `docs_per_agent` | 30 |
+| `logging` | generation_log + population_json + phylogeny_jsonl + phylogeny_graph |
+
+### Phase 1b pilot observations
+
+Desert, 12 generations, `N0=12`, `K_max=30`:
+
+- Deaths occurred in every generation, so the mechanics are working.
+- The population converged to an endogenous equilibrium of about 13 agents, below `K_max`.
+- Generation 6 showed a strong pruning event with `deaths=7` and increasing JSD.
+- `std_fitness` oscillated rather than collapsing permanently, which is consistent with a healthy dynamic system.
+
+Genealogical observation:
+
+- The highest-fitness founder in generation 0 (f=0.442) went extinct by generation 3.
+- A medium-fitness founder (f=0.419) dominated throughout all 12 generations.
+- Frequency-dependent selection emerged from the mechanics rather than being explicitly programmed.
+- Over-specialized long lines were eliminated by toxic documents outside their training distribution.
+
+### Next experiments
+
+- Cross-biome transfer: desert survivors from generation 35 into a Savanna starter population.
+- H0: pre-adaptation in Desert does not accelerate adaptation in Savanna.
+- Mixed inoculation: 4 survivors per biome into a new environment, then track which lineages dominate genealogically.
+- Phase 2: archetypes with Id/Ego/Superego LoRA adapters, using Phase 1b as the baseline.
+
+### Open question
+
+Are Desert survivors generalists with broad LoRA robustness, or simply weakly specialized agents with low absolute fitness?
+The immediate test is to compare Desert survivors against a Savanna fresh start in the same environment.
+
 ### Phase status after this session
 
 | Phase | Status | Note |
